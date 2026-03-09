@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environments
+venv/
+env/
+.env
+.venv
+env.bak/
+venv.bak/
+
+# SQLite
+*.sqlite3
+
+# Alembic
+# alembic.ini # alembic.ini'yi göndermek isteyebiliriz ama içindeki şifreyi .env'den okuttuğumuz için güvenli
