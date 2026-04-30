@@ -8,7 +8,7 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 from schemas import BloodTestExtraction, NutritionalInsight, MealRecommendation
 
-# Sabit Yemek Listesi (Görsel Üretimi İçin Kısıtlama)
+# Sabit Yemek Listesi
 FIXED_MEALS = """1. Zeytinyağlı Enginar Kalbi
 2. Zerdeçallı ve Zencefilli Fırın Karnabahar
 3. Kuşkonmazlı ve Mantarlı Kinoa Kasesi
@@ -49,6 +49,104 @@ FIXED_MEALS = """1. Zeytinyağlı Enginar Kalbi
 38. Fırınlanmış Tofu Küpleri
 39. Süzme Yoğurtlu Köz Patlıcan (Babagannuş)
 40. Köy Peynirli ve Dereotlu Girit Ezmesi"""
+
+# ---------------------------------------------------------------------------
+# 40 Sabit Yemek için Statik Görsel Haritası (Unsplash curated fotoğraflar)
+# Pollinations AI üretimi yerine — anında yüklenir, ücretsiz, yüksek kalite.
+# ---------------------------------------------------------------------------
+MEAL_IMAGES: dict[str, str] = {
+    "Zeytinyağlı Enginar Kalbi":
+        "https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&h=400&fit=crop",
+    "Zerdeçallı ve Zencefilli Fırın Karnabahar":
+        "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=400&h=400&fit=crop",
+    "Kuşkonmazlı ve Mantarlı Kinoa Kasesi":
+        "https://images.unsplash.com/photo-1505576399279-565b52d4ac71?w=400&h=400&fit=crop",
+    "Brokoli ve Ispanaklı Yeşil Detoks Çorbası":
+        "https://images.unsplash.com/photo-1547592166-23ac45744acd?w=400&h=400&fit=crop",
+    "Fesleğenli Fırın Tatlı Patates":
+        "https://images.unsplash.com/photo-1596560548464-f010549b84d7?w=400&h=400&fit=crop",
+    "Zeytinyağlı Kereviz Yemeği":
+        "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=400&h=400&fit=crop",
+    "Sarımsaklı Yoğurtlu Pazı Kavurma":
+        "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&h=400&fit=crop",
+    "Zerdeçallı Altın Süt (Golden Milk)":
+        "https://images.unsplash.com/photo-1615485290382-441e4d049cb5?w=400&h=400&fit=crop",
+    "Kırmızı Lahana ve Havuçlu Detoks Salatası":
+        "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=400&h=400&fit=crop",
+    "Karabuğdaylı Semizotu Salatası":
+        "https://images.unsplash.com/photo-1592417817098-8fd3d9eb14a5?w=400&h=400&fit=crop",
+    "Fırınlanmış Somon ve Izgara Sebzeler":
+        "https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=400&h=400&fit=crop",
+    "Cevizli ve Avokadolu Roka Salatası":
+        "https://images.unsplash.com/photo-1551248429-40975aa4de74?w=400&h=400&fit=crop",
+    "Zeytinyağlı Humus ve Havuç Çubukları":
+        "https://images.unsplash.com/photo-1571091718767-18b5b1457add?w=400&h=400&fit=crop",
+    "Avokado Ezmeli Tam Buğday Tost":
+        "https://images.unsplash.com/photo-1541519227354-08fa5d50c820?w=400&h=400&fit=crop",
+    "Fırınlanmış Bademli Brüksel Lahanası":
+        "https://images.unsplash.com/photo-1550989460-0adf9ea622e2?w=400&h=400&fit=crop",
+    "Cevizli Ev Yapımı Pesto Soslu Kabak Spagetti":
+        "https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=400&h=400&fit=crop",
+    "Zeytinyağlı Taze Fasulye":
+        "https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=400&h=400&fit=crop",
+    "Keten Tohumlu ve Yaban Mersinli Yoğurt":
+        "https://images.unsplash.com/photo-1488477181946-6428a0291777?w=400&h=400&fit=crop",
+    "Ton Balıklı Kinoa Kasesi":
+        "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=400&fit=crop",
+    "Fırınlanmış Susamlı Somon Köftesi":
+        "https://images.unsplash.com/photo-1485704686097-ed47f7263ca4?w=400&h=400&fit=crop",
+    "Taze Vişne ve Kiraz Kasesi (veya Suyu)":
+        "https://images.unsplash.com/photo-1528821128474-27f963b062bf?w=400&h=400&fit=crop",
+    "Limonlu ve Naneli Salatalık Çorbası (Soğuk)":
+        "https://images.unsplash.com/photo-1476718406336-bb5a9690ee2a?w=400&h=400&fit=crop",
+    "Bol Domatesli Şehriye Çorbası":
+        "https://images.unsplash.com/photo-1603105037880-880cd4edfb0d?w=400&h=400&fit=crop",
+    "Cevizli ve Narlı Ispanak Salatası":
+        "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&h=400&fit=crop",
+    "Fırınlanmış Domates ve Biber Dolması (Etsiz)":
+        "https://images.unsplash.com/photo-1498579150354-977475b7ea0b?w=400&h=400&fit=crop",
+    "Kızılcık (Cranberry) Suyu":
+        "https://images.unsplash.com/photo-1534353473418-4cfa0a5f79a1?w=400&h=400&fit=crop",
+    "Zeytinyağlı Bamya Yemeği":
+        "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=400&h=400&fit=crop",
+    "Yoğurtlu Havuç Tarator":
+        "https://images.unsplash.com/photo-1447175008436-054170c2e979?w=400&h=400&fit=crop",
+    "Mandalina ve Greyfurt Salatası":
+        "https://images.unsplash.com/photo-1547592180-85f173990554?w=400&h=400&fit=crop",
+    "Limonlu Izgara Kuşkonmaz":
+        "https://images.unsplash.com/photo-1asparagus-grilled?w=400&h=400&fit=crop",
+    "Sütlü ve Yulaflı Chia Puding":
+        "https://images.unsplash.com/photo-1614961233913-a5113a4a34ed?w=400&h=400&fit=crop",
+    "Lor Peynirli ve Çörek Otlu Tam Buğday Makarna":
+        "https://images.unsplash.com/photo-1473093295043-cdd812d0e601?w=400&h=400&fit=crop",
+    "Sütlü Kabak Çorbası":
+        "https://images.unsplash.com/photo-1476718406336-bb5a9690ee2a?w=400&h=400&fit=crop",
+    "Peynirli ve Ispanaklı Fırın Omlet (Frittata)":
+        "https://images.unsplash.com/photo-1608039829572-78524f79c4c7?w=400&h=400&fit=crop",
+    "Yoğurtlu Soslu Fırın Falafel":
+        "https://images.unsplash.com/photo-1593560704563-f176a2eb61db?w=400&h=400&fit=crop",
+    "Kefir ve Çilekli Smoothie":
+        "https://images.unsplash.com/photo-1553530666-ba11a7da3888?w=400&h=400&fit=crop",
+    "Mozzarella Peynirli Fesleğenli Domates (Caprese)":
+        "https://images.unsplash.com/photo-1565299507177-b0ac66763828?w=400&h=400&fit=crop",
+    "Fırınlanmış Tofu Küpleri":
+        "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=400&fit=crop",
+    "Süzme Yoğurtlu Köz Patlıcan (Babagannuş)":
+        "https://images.unsplash.com/photo-1572453800999-e8d2d1589b7c?w=400&h=400&fit=crop",
+    "Köy Peynirli ve Dereotlu Girit Ezmesi":
+        "https://images.unsplash.com/photo-1559847844-5315695dadae?w=400&h=400&fit=crop",
+}
+
+def get_meal_image(food_name: str) -> str:
+    """
+    Yemek adına göre statik görsel URL döner.
+    Haritada bulunamazsa Pexels arama sayfasına yönlendirir (fallback).
+    """
+    if food_name in MEAL_IMAGES:
+        return MEAL_IMAGES[food_name]
+    # Fallback: Pexels üzerinde İngilizce arama URL'si
+    slug = food_name.lower().replace(" ", "+").replace("(", "").replace(")", "")
+    return f"https://images.pexels.com/search/food+{slug}?w=400&h=400&fit=crop"
 
 # Logging
 logger = logging.getLogger(__name__)
@@ -142,7 +240,7 @@ Sabit Yemek Havuzu:
 ÖNEMLİ KURAL 2: Her ogun icin:
 - Yemegin adini ver (food_name).
 - Hastanin kan tahlilindeki degerleri desteklemek icin neden onerildigini tek bir Turkce cumle ile acikla (reason).
-- "https://image.pollinations.ai/prompt/top-down-view-of-vibrant-[ENGLISH-FOOD-NAME]-in-a-bowl-photorealistic-food-photography-bright-lighting?width=400&height=400&nologo=true" formatinda resim URL'si (image_url).
+- image_url alanina sadece bos string koy: ""
 - Hazirlama suresi (prep_time) (orn: "20m").
 - Zorluk (difficulty) (Easy, Medium, Hard).
 - Puan (rating) (orn: "4.8", "5.0").
@@ -180,6 +278,18 @@ HATA YAPMA: JSON anahtarlari Ingilizce, degerler Turkce olmali. Tum alanlar dold
     return system_prompt, user_prompt
 
 
+def _inject_meal_images(result_dict: dict) -> None:
+    """
+    Gemini'nin ürettiği JSON dict içindeki tüm meal'lerin image_url'ini
+    statik MEAL_IMAGES haritasından gelen değerle değiştirir.
+    Haritada bulunmayan yemekler için get_meal_image fallback URL'sini kullanır.
+    """
+    for day in result_dict.get("daily_plans", []):
+        for meal in day.get("meals", []):
+            food_name = meal.get("food_name", "")
+            meal["image_url"] = get_meal_image(food_name)
+
+
 def generate_nutritional_insight(extraction: BloodTestExtraction) -> NutritionalInsight:
     """
     PDF'ten parse edilen BloodTestExtraction verisini Google Gemini AI'ya gonderir.
@@ -191,6 +301,7 @@ def generate_nutritional_insight(extraction: BloodTestExtraction) -> Nutritional
         response_text = _get_gemini_response(sys_prompt, user_prompt)
         cleaned = _clean_json(response_text)
         result_dict = json.loads(cleaned)
+        _inject_meal_images(result_dict)
         return NutritionalInsight(**result_dict)
     except json.JSONDecodeError as je:
         logger.error(f"JSON Cozumleme Hatasi: {str(je)}\nRaw response: {response_text[:500]}")
@@ -216,6 +327,7 @@ def generate_insight_from_db_results(test_date, results: list, dietary_preferenc
         response_text = _get_gemini_response(sys_prompt, user_prompt)
         cleaned = _clean_json(response_text)
         result_dict = json.loads(cleaned)
+        _inject_meal_images(result_dict)
         return NutritionalInsight(**result_dict)
     except json.JSONDecodeError as je:
         logger.error(f"JSON Cozumleme Hatasi (DB): {str(je)}\nRaw response: {response_text[:500]}")
@@ -261,5 +373,6 @@ Ayni JSON semasi:
     response_text = _get_gemini_response(sys_prompt, user_prompt)
     cleaned = _clean_json(response_text)
     result_dict = json.loads(cleaned)
+    result_dict["image_url"] = get_meal_image(result_dict.get("food_name", ""))
     return MealRecommendation(**result_dict)
 
