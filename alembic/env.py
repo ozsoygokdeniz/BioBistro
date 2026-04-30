@@ -46,7 +46,7 @@ def run_migrations_offline() -> None:
 
     load_dotenv()
     
-    url = os.environ.get("SUPABASE_DB_URL") or config.get_main_option("sqlalchemy.url")
+    url = os.environ.get("ALEMBIC_DB_URL", os.environ.get("SUPABASE_DB_URL")) or config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -70,7 +70,7 @@ def run_migrations_online() -> None:
 
     load_dotenv()
     section = config.get_section(config.config_ini_section, {})
-    supabase_url = os.environ.get("SUPABASE_DB_URL")
+    supabase_url = os.environ.get("ALEMBIC_DB_URL", os.environ.get("SUPABASE_DB_URL"))
     if supabase_url:
         section["sqlalchemy.url"] = supabase_url
         
