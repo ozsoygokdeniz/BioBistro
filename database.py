@@ -5,10 +5,15 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 
 load_dotenv()
 
-# .env'den Supabase bağlantısını al, bulamazsa yedeğe düş
-SQLALCHEMY_DATABASE_URL = os.getenv("SUPABASE_DB_URL", "postgresql://postgres:password@localhost:5432/biobistro")
+# .env'den Supabase bağlantısını al
+SQLALCHEMY_DATABASE_URL = os.getenv("ALEMBIC_DB_URL", os.getenv("SUPABASE_DB_URL"))
 
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
+from sqlalchemy.pool import NullPool
+
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL,
+    poolclass=NullPool  # Supabase/PgBouncer için en güvenli havuzlama yöntemi
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()

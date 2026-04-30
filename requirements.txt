@@ -5,5 +5,8 @@ psycopg2-binary
 alembic
 pydantic
 pdfplumber
-google-generativeai
+boto3
 python-dotenv
+python-multipart
+passlib[bcrypt]
+pyjwt
