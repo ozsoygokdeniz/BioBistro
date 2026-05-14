@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Redirect } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, Platform } from 'react-native';
 import { theme } from '../src/theme';
 
 export default function Index() {
@@ -10,7 +10,12 @@ export default function Index() {
   useEffect(() => {
     const checkToken = async () => {
       try {
-        const token = await SecureStore.getItemAsync('token');
+        let token = null;
+        if (Platform.OS === 'web') {
+          token = localStorage.getItem('token');
+        } else {
+          token = await SecureStore.getItemAsync('token');
+        }
         setIsAuthenticated(!!token);
       } catch (err) {
         setIsAuthenticated(false);

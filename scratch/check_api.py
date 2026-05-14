@@ -1,0 +1,14 @@
+import sys, requests
+sys.path.insert(0, '.')
+from database import SessionLocal
+from models import BloodTest, User
+db = SessionLocal()
+test = db.query(BloodTest).order_by(BloodTest.id.desc()).first()
+user = db.query(User).filter_by(id=test.user_id).first()
+from core.security import create_access_token
+token = create_access_token({'sub': user.email})
+resp = requests.get(f'http://127.0.0.1:8000/api/v1/blood-tests/{test.id}', headers={'Authorization': f'Bearer {token}'})
+data = resp.json()
+for r in data['results']:
+    if r['parameter_name'] in ['BAKTERİ', 'BİLİRÜBİN', 'DANSİTE', 'GÖRÜNÜM']:
+        print(f"{r['parameter_name']} -> status: {r.get('status')}")

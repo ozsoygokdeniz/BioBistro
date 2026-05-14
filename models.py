@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Table, JSON
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Table, JSON, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 from database import Base
@@ -18,6 +18,11 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     dietary_preferences = Column(JSON, default=list) # örn. ["Vegan", "Keto"]
+    # Profil bilgileri
+    age = Column(Integer, nullable=True)
+    weight_kg = Column(Float, nullable=True)
+    height_cm = Column(Float, nullable=True)
+    goal = Column(String, nullable=True)  # örn. "Kilo ver", "Kas kazan", "Enerji artır"
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     allergies = relationship('Allergy', secondary=user_allergies, back_populates='users')

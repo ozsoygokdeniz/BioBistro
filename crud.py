@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from models import User, BloodTest, BloodTestResult
 from schemas import BloodTestExtraction, UserCreate
 from core.security import get_password_hash
@@ -58,6 +58,7 @@ def get_blood_tests_by_user(db: Session, user_id: int):
     """Kullanıcıya ait tüm kan testlerini tarih sırasıyla döner."""
     return (
         db.query(BloodTest)
+        .options(selectinload(BloodTest.results))
         .filter(BloodTest.user_id == user_id)
         .order_by(BloodTest.date_taken.desc())
         .all()
@@ -67,16 +68,60 @@ def get_blood_test_by_id(db: Session, test_id: int, user_id: int):
     """Belirli bir kan testini sahiplik kontrolüyle getirir."""
     return (
         db.query(BloodTest)
+        .options(selectinload(BloodTest.results))
         .filter(BloodTest.id == test_id, BloodTest.user_id == user_id)
         .first()
     )
 
-def update_user(db: Session, user: User, name: str = None, dietary_preferences: list = None):
-    """Kullanıcının profilini (ad ve/veya diyet tercihleri) günceller."""
+def update_user(db: Session, user: User, name: str = None, dietary_preferences: list = None,
+                age: int = None, weight_kg: float = None, height_cm: float = None, goal: str = None):
+    """Kullanıcının profilini günceller."""
     if name is not None:
         user.name = name
     if dietary_preferences is not None:
         user.dietary_preferences = dietary_preferences
+    if age is not None:
+        user.age = age
+    if weight_kg is not None:
+        user.weight_kg = weight_kg
+    if height_cm is not None:
+        user.height_cm = height_cm
+    if goal is not None:
+        user.goal = goal
     db.commit()
     db.refresh(user)
     return user
+
+
+def get_parameter_trends(db: Session, user_id: int):
+    """
+    Kullanıcının tüm kan testlerindeki parametreleri toplayıp
+    parametre adına göre gruplandırılmış trend verisi döner.
+    Sadece birden fazla tahlilde görünen ve sayısal değeri olan parametreler alınır.
+    """
+    tests = (
+        db.query(BloodTest)
+        .options(selectinload(BloodTest.results))
+        .filter(BloodTest.user_id == user_id)
+        .order_by(BloodTest.date_taken.asc())
+        .all()
+    )
+    
+    # param_name -> list of (date, value, unit, ref)
+    from collections import defaultdict
+    grouped = defaultdict(list)
+    
+    for test in tests:
+        for r in test.results:
+            if r.value is not None:  # sadece sayısal değerler
+                grouped[r.parameter_name].append({
+                    "date": test.date_taken,
+                    "value": r.value,
+                    "unit": r.unit,
+                    "reference_range": r.reference_range,
+                    "original_value": r.original_value,
+                    "parameter_name": r.parameter_name,
+                })
+    
+    # En az 2 veri noktası olmadan trend anlamlı değil — tek ölçüm düz çizgi gösterir
+    return {name: points for name, points in grouped.items() if len(points) >= 2}

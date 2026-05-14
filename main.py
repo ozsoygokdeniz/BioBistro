@@ -1,5 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 from database import get_db
 import crud
@@ -43,6 +44,10 @@ app.include_router(auth.router)
 app.include_router(blood_tests.router)
 app.include_router(users.router)
 
+# Mobil ve Web tarafında resimlerin yüklenebilmesi için static klasörünü sunuyoruz
+from fastapi.staticfiles import StaticFiles
+app.mount("/meal-images", StaticFiles(directory="static/meal-images"), name="meal-images")
+
 @app.get("/")
 def read_root():
     return {"message": "BioBistro API çalışıyor", "status": "aktif"}
@@ -54,7 +59,7 @@ async def parse_blood_test_pdf(file: UploadFile = File(...)):
     
     try:
         content = await file.read()
-        extraction_result = parse_enabiz_pdf(content)
+        extraction_result = await run_in_threadpool(parse_enabiz_pdf, content)
         return extraction_result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"PDF okuma sırasında bir hata oluştu: {str(e)}")
@@ -70,7 +75,7 @@ async def upload_blood_test_pdf(
     
     try:
         content = await file.read()
-        extraction_result = parse_enabiz_pdf(content)
+        extraction_result = await run_in_threadpool(parse_enabiz_pdf, content)
         
         # Veritabanina token'ın sahibine (current_user) kaydet
         saved_blood_test = crud.save_blood_test_extraction(
@@ -100,10 +105,10 @@ async def analyze_blood_test_pdf(file: UploadFile = File(...)):
     try:
         # 1. PDF'i oku ve yapılandırılmış veriye dönüştür
         content = await file.read()
-        extraction_result = parse_enabiz_pdf(content)
+        extraction_result = await run_in_threadpool(parse_enabiz_pdf, content)
         
         # 2. Çıkarılan bu veriyi AI servisine yolla ve tavsiyeyi al
-        insight = generate_nutritional_insight(extraction_result)
+        insight = await run_in_threadpool(generate_nutritional_insight, extraction_result)
         
         return insight
         

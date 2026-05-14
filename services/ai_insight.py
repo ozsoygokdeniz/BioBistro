@@ -4,7 +4,8 @@ import re
 import traceback
 import logging
 import time
-import google.generativeai as genai
+import google.genai as genai
+from google.genai import types as genai_types
 from dotenv import load_dotenv
 from schemas import BloodTestExtraction, NutritionalInsight, MealRecommendation
 
@@ -51,90 +52,50 @@ FIXED_MEALS = """1. Zeytinyağlı Enginar Kalbi
 40. Köy Peynirli ve Dereotlu Girit Ezmesi"""
 
 # ---------------------------------------------------------------------------
-# 40 Sabit Yemek için Statik Görsel Haritası (Unsplash curated fotoğraflar)
-# Pollinations AI üretimi yerine — anında yüklenir, ücretsiz, yüksek kalite.
+# 40 Sabit Yemek için Yerel Görsel Haritası
+# Kullanıcının yüklediği fotoğrafları (/meal-images/X.png) kullanır.
 # ---------------------------------------------------------------------------
 MEAL_IMAGES: dict[str, str] = {
-    "Zeytinyağlı Enginar Kalbi":
-        "https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&h=400&fit=crop",
-    "Zerdeçallı ve Zencefilli Fırın Karnabahar":
-        "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=400&h=400&fit=crop",
-    "Kuşkonmazlı ve Mantarlı Kinoa Kasesi":
-        "https://images.unsplash.com/photo-1505576399279-565b52d4ac71?w=400&h=400&fit=crop",
-    "Brokoli ve Ispanaklı Yeşil Detoks Çorbası":
-        "https://images.unsplash.com/photo-1547592166-23ac45744acd?w=400&h=400&fit=crop",
-    "Fesleğenli Fırın Tatlı Patates":
-        "https://images.unsplash.com/photo-1596560548464-f010549b84d7?w=400&h=400&fit=crop",
-    "Zeytinyağlı Kereviz Yemeği":
-        "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=400&h=400&fit=crop",
-    "Sarımsaklı Yoğurtlu Pazı Kavurma":
-        "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&h=400&fit=crop",
-    "Zerdeçallı Altın Süt (Golden Milk)":
-        "https://images.unsplash.com/photo-1615485290382-441e4d049cb5?w=400&h=400&fit=crop",
-    "Kırmızı Lahana ve Havuçlu Detoks Salatası":
-        "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=400&h=400&fit=crop",
-    "Karabuğdaylı Semizotu Salatası":
-        "https://images.unsplash.com/photo-1592417817098-8fd3d9eb14a5?w=400&h=400&fit=crop",
-    "Fırınlanmış Somon ve Izgara Sebzeler":
-        "https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=400&h=400&fit=crop",
-    "Cevizli ve Avokadolu Roka Salatası":
-        "https://images.unsplash.com/photo-1551248429-40975aa4de74?w=400&h=400&fit=crop",
-    "Zeytinyağlı Humus ve Havuç Çubukları":
-        "https://images.unsplash.com/photo-1571091718767-18b5b1457add?w=400&h=400&fit=crop",
-    "Avokado Ezmeli Tam Buğday Tost":
-        "https://images.unsplash.com/photo-1541519227354-08fa5d50c820?w=400&h=400&fit=crop",
-    "Fırınlanmış Bademli Brüksel Lahanası":
-        "https://images.unsplash.com/photo-1550989460-0adf9ea622e2?w=400&h=400&fit=crop",
-    "Cevizli Ev Yapımı Pesto Soslu Kabak Spagetti":
-        "https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=400&h=400&fit=crop",
-    "Zeytinyağlı Taze Fasulye":
-        "https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=400&h=400&fit=crop",
-    "Keten Tohumlu ve Yaban Mersinli Yoğurt":
-        "https://images.unsplash.com/photo-1488477181946-6428a0291777?w=400&h=400&fit=crop",
-    "Ton Balıklı Kinoa Kasesi":
-        "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=400&fit=crop",
-    "Fırınlanmış Susamlı Somon Köftesi":
-        "https://images.unsplash.com/photo-1485704686097-ed47f7263ca4?w=400&h=400&fit=crop",
-    "Taze Vişne ve Kiraz Kasesi (veya Suyu)":
-        "https://images.unsplash.com/photo-1528821128474-27f963b062bf?w=400&h=400&fit=crop",
-    "Limonlu ve Naneli Salatalık Çorbası (Soğuk)":
-        "https://images.unsplash.com/photo-1476718406336-bb5a9690ee2a?w=400&h=400&fit=crop",
-    "Bol Domatesli Şehriye Çorbası":
-        "https://images.unsplash.com/photo-1603105037880-880cd4edfb0d?w=400&h=400&fit=crop",
-    "Cevizli ve Narlı Ispanak Salatası":
-        "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&h=400&fit=crop",
-    "Fırınlanmış Domates ve Biber Dolması (Etsiz)":
-        "https://images.unsplash.com/photo-1498579150354-977475b7ea0b?w=400&h=400&fit=crop",
-    "Kızılcık (Cranberry) Suyu":
-        "https://images.unsplash.com/photo-1534353473418-4cfa0a5f79a1?w=400&h=400&fit=crop",
-    "Zeytinyağlı Bamya Yemeği":
-        "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=400&h=400&fit=crop",
-    "Yoğurtlu Havuç Tarator":
-        "https://images.unsplash.com/photo-1447175008436-054170c2e979?w=400&h=400&fit=crop",
-    "Mandalina ve Greyfurt Salatası":
-        "https://images.unsplash.com/photo-1547592180-85f173990554?w=400&h=400&fit=crop",
-    "Limonlu Izgara Kuşkonmaz":
-        "https://images.unsplash.com/photo-1asparagus-grilled?w=400&h=400&fit=crop",
-    "Sütlü ve Yulaflı Chia Puding":
-        "https://images.unsplash.com/photo-1614961233913-a5113a4a34ed?w=400&h=400&fit=crop",
-    "Lor Peynirli ve Çörek Otlu Tam Buğday Makarna":
-        "https://images.unsplash.com/photo-1473093295043-cdd812d0e601?w=400&h=400&fit=crop",
-    "Sütlü Kabak Çorbası":
-        "https://images.unsplash.com/photo-1476718406336-bb5a9690ee2a?w=400&h=400&fit=crop",
-    "Peynirli ve Ispanaklı Fırın Omlet (Frittata)":
-        "https://images.unsplash.com/photo-1608039829572-78524f79c4c7?w=400&h=400&fit=crop",
-    "Yoğurtlu Soslu Fırın Falafel":
-        "https://images.unsplash.com/photo-1593560704563-f176a2eb61db?w=400&h=400&fit=crop",
-    "Kefir ve Çilekli Smoothie":
-        "https://images.unsplash.com/photo-1553530666-ba11a7da3888?w=400&h=400&fit=crop",
-    "Mozzarella Peynirli Fesleğenli Domates (Caprese)":
-        "https://images.unsplash.com/photo-1565299507177-b0ac66763828?w=400&h=400&fit=crop",
-    "Fırınlanmış Tofu Küpleri":
-        "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=400&fit=crop",
-    "Süzme Yoğurtlu Köz Patlıcan (Babagannuş)":
-        "https://images.unsplash.com/photo-1572453800999-e8d2d1589b7c?w=400&h=400&fit=crop",
-    "Köy Peynirli ve Dereotlu Girit Ezmesi":
-        "https://images.unsplash.com/photo-1559847844-5315695dadae?w=400&h=400&fit=crop",
+    "Zeytinyağlı Enginar Kalbi": "/meal-images/1.png",
+    "Zerdeçallı ve Zencefilli Fırın Karnabahar": "/meal-images/2.png",
+    "Kuşkonmazlı ve Mantarlı Kinoa Kasesi": "/meal-images/3.png",
+    "Brokoli ve Ispanaklı Yeşil Detoks Çorbası": "/meal-images/4.png",
+    "Fesleğenli Fırın Tatlı Patates": "/meal-images/5.png",
+    "Zeytinyağlı Kereviz Yemeği": "/meal-images/6.png",
+    "Sarımsaklı Yoğurtlu Pazı Kavurma": "/meal-images/7.png",
+    "Zerdeçallı Altın Süt (Golden Milk)": "/meal-images/8.png",
+    "Kırmızı Lahana ve Havuçlu Detoks Salatası": "/meal-images/9.png",
+    "Karabuğdaylı Semizotu Salatası": "/meal-images/10.png",
+    "Fırınlanmış Somon ve Izgara Sebzeler": "/meal-images/11.png",
+    "Cevizli ve Avokadolu Roka Salatası": "/meal-images/12.png",
+    "Zeytinyağlı Humus ve Havuç Çubukları": "/meal-images/13.png",
+    "Avokado Ezmeli Tam Buğday Tost": "/meal-images/14.png",
+    "Fırınlanmış Bademli Brüksel Lahanası": "/meal-images/15.png",
+    "Cevizli Ev Yapımı Pesto Soslu Kabak Spagetti": "/meal-images/16.png",
+    "Zeytinyağlı Taze Fasulye": "/meal-images/17.png",
+    "Keten Tohumlu ve Yaban Mersinli Yoğurt": "/meal-images/18.png",
+    "Ton Balıklı Kinoa Kasesi": "/meal-images/19.png",
+    "Fırınlanmış Susamlı Somon Köftesi": "/meal-images/20.png",
+    "Taze Vişne ve Kiraz Kasesi (veya Suyu)": "/meal-images/21.png",
+    "Limonlu ve Naneli Salatalık Çorbası (Soğuk)": "/meal-images/22.png",
+    "Bol Domatesli Şehriye Çorbası": "/meal-images/23.png",
+    "Cevizli ve Narlı Ispanak Salatası": "/meal-images/24.png",
+    "Fırınlanmış Domates ve Biber Dolması (Etsiz)": "/meal-images/25.png",
+    "Kızılcık (Cranberry) Suyu": "/meal-images/26.png",
+    "Zeytinyağlı Bamya Yemeği": "/meal-images/27.png",
+    "Yoğurtlu Havuç Tarator": "/meal-images/28.png",
+    "Mandalina ve Greyfurt Salatası": "/meal-images/29.png",
+    "Limonlu Izgara Kuşkonmaz": "/meal-images/30.png",
+    "Sütlü ve Yulaflı Chia Puding": "/meal-images/31.png",
+    "Lor Peynirli ve Çörek Otlu Tam Buğday Makarna": "/meal-images/32.png",
+    "Sütlü Kabak Çorbası": "/meal-images/33.png",
+    "Peynirli ve Ispanaklı Fırın Omlet (Frittata)": "/meal-images/34.png",
+    "Yoğurtlu Soslu Fırın Falafel": "/meal-images/35.png",
+    "Kefir ve Çilekli Smoothie": "/meal-images/36.png",
+    "Mozzarella Peynirli Fesleğenli Domates (Caprese)": "/meal-images/37.png",
+    "Fırınlanmış Tofu Küpleri": "/meal-images/38.png",
+    "Süzme Yoğurtlu Köz Patlıcan (Babagannuş)": "/meal-images/39.png",
+    "Köy Peynirli ve Dereotlu Girit Ezmesi": "/meal-images/40.png",
 }
 
 def get_meal_image(food_name: str) -> str:
@@ -142,11 +103,25 @@ def get_meal_image(food_name: str) -> str:
     Yemek adına göre statik görsel URL döner.
     Haritada bulunamazsa Pexels arama sayfasına yönlendirir (fallback).
     """
-    if food_name in MEAL_IMAGES:
-        return MEAL_IMAGES[food_name]
-    # Fallback: Pexels üzerinde İngilizce arama URL'si
-    slug = food_name.lower().replace(" ", "+").replace("(", "").replace(")", "")
-    return f"https://images.pexels.com/search/food+{slug}?w=400&h=400&fit=crop"
+    if not food_name:
+        return ""
+        
+    # AI bazen "1. Zeytinyağlı Enginar" şeklinde liste numarasıyla döndürebilir
+    # Baştaki rakam, nokta ve boşlukları temizle
+    cleaned_name = re.sub(r'^\d+\.\s*', '', food_name).strip()
+    
+    if cleaned_name in MEAL_IMAGES:
+        return MEAL_IMAGES[cleaned_name]
+        
+    # Sadece isimler tam eşleşmezse diye, alt string araması da yapalım
+    for key, img_url in MEAL_IMAGES.items():
+        if key.lower() in cleaned_name.lower() or cleaned_name.lower() in key.lower():
+            return img_url
+            
+    # Fallback: Eğer hiç bulunamazsa, kırık resim yerine boş dönebiliriz veya placeholder koyabiliriz
+    # Pexels URL'si bir web sayfasıydı, resim değil. Bu yüzden resim patlıyordu.
+    # Sabit bir varsayılan sağlıklı yemek görseli koyalım:
+    return "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=400&h=400&fit=crop"
 
 # Logging
 logger = logging.getLogger(__name__)
@@ -154,12 +129,23 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 
+from services.analytics import get_value_status
+
 def _format_blood_test_data(extraction: BloodTestExtraction) -> str:
-    """Kan testi verisini AI için okunabilir string formata çevirir."""
+    """Kan testi verisini AI için okunabilir string formata çevirir. Sadece anormal değerleri vurgular."""
     lines = [f"Test Tarihi: {extraction.date_taken}", "-" * 30]
+    abnormal_found = False
     for param in extraction.parameters:
-        ref = param.reference_range if param.reference_range else "Belirtilmemis"
-        lines.append(f"{param.parameter_name}: {param.value} {param.unit} (Referans: {ref})")
+        status = get_value_status(param.numeric_value, param.reference_range, param.value, param.parameter_name)
+        if status in ["high", "low"]:
+            abnormal_found = True
+            ref = param.reference_range if param.reference_range else "Belirtilmemis"
+            durum_tr = "YÜKSEK" if status == "high" else "DÜŞÜK"
+            lines.append(f"[DİKKAT: {durum_tr}] {param.parameter_name}: {param.value} {param.unit} (Referans: {ref})")
+            
+    if not abnormal_found:
+        lines.append("Harika! Bu tahlildeki tüm değerler normal referans aralıklarında.")
+        
     return "\n".join(lines)
 
 
@@ -180,45 +166,60 @@ def _get_gemini_response(system_prompt: str, user_prompt: str) -> str:
     """
     Google Gemini (AI Studio) uzerinden JSON istegi gonderir.
     GEMINI_API_KEY ortam degiskenini kullanir.
+    503/429 icin otomatik retry + gemini-2.0-flash fallback.
     """
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise ValueError("GEMINI_API_KEY ortam degiskeni bulunamadi. Lutfen .env dosyasina ekleyin.")
-        
-    genai.configure(api_key=api_key)
-    model_name = "gemini-flash-latest"
-    
-    generation_config = genai.types.GenerationConfig(
-        temperature=0.4,
-        response_mime_type="application/json",
-    )
-    
-    # Gemini 1.5 modelleri system_instruction destekler
-    model = genai.GenerativeModel(
-        model_name=model_name,
-        system_instruction=system_prompt,
-        generation_config=generation_config
-    )
-    
-    for attempt in range(3):
-        try:
-            logger.info(f"AI analizi: Google Gemini {model_name} (deneme {attempt + 1}/3)")
-            response = model.generate_content(user_prompt)
-            
-            if response.text:
-                logger.info(f"AI analizi basarili: {model_name}")
-                return response.text
-            else:
-                raise Exception("AI bos cevap dondurdu.")
-                
-        except Exception as e:
-            logger.warning(f"Gemini Hata (deneme {attempt+1}): {str(e)}")
-            if '429' in str(e) or 'quota' in str(e).lower():
-                time.sleep(5)
-                continue
-            time.sleep(2)
-            
-    raise Exception("Tum Gemini AI denemeleri basarisiz oldu.")
+
+    client = genai.Client(api_key=api_key)
+
+    # Oncelikli model, erisim sorunu olursa yedek
+    models_to_try = ["gemini-2.5-flash", "gemini-2.0-flash"]
+    last_error = None
+
+    for model_name in models_to_try:
+        for attempt in range(4):
+            try:
+                logger.info(f"AI analizi: {model_name} (deneme {attempt + 1}/4)")
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=user_prompt,
+                    config=genai_types.GenerateContentConfig(
+                        system_instruction=system_prompt,
+                        temperature=0.4,
+                        response_mime_type="application/json",
+                    )
+                )
+
+                if response.text:
+                    logger.info(f"AI analizi basarili: {model_name}")
+                    return response.text
+                else:
+                    raise Exception("AI bos cevap dondurdu.")
+
+            except Exception as e:
+                last_error = e
+                err_str = str(e)
+                logger.warning(f"Gemini Hata [{model_name}] (deneme {attempt + 1}): {err_str[:200]}")
+
+                if '503' in err_str or 'UNAVAILABLE' in err_str or 'high demand' in err_str.lower():
+                    wait_sec = 8 * (attempt + 1)
+                    logger.info(f"503 alindi, {wait_sec}s bekleniyor...")
+                    time.sleep(wait_sec)
+                    continue
+                elif '429' in err_str or 'quota' in err_str.lower() or 'RESOURCE_EXHAUSTED' in err_str:
+                    time.sleep(10)
+                    continue
+                elif '404' in err_str or 'NOT_FOUND' in err_str:
+                    logger.warning(f"{model_name} 404 aldi, yedek modele geciliyor...")
+                    break  # ic donguyu kirarak sonraki model_name'e gec
+                else:
+                    time.sleep(3)
+        else:
+            logger.warning(f"{model_name} icin tum denemeler basarisiz, yedek modele geciliyor...")
+
+    raise Exception(f"Tum Gemini modelleri basarisiz. Son hata: {str(last_error)[:300]}")
 
 
 def _build_nutrition_prompts(formatted_data: str, dietary_preferences: list = None) -> tuple[str, str]:
@@ -230,7 +231,7 @@ def _build_nutrition_prompts(formatted_data: str, dietary_preferences: list = No
 
     system_prompt = f"""
 Sen uzman bir fonksiyonel tip diyetisyeni ve doktorusun.
-Asagida bir hastanin kan tahlili sonuclari veriliyor. Sonuclara gore hastaya 3 farkli gunluk (1. Gun, 2. Gun, 3. Gun) ve her gun icin 3 ogunluk (Sabah, Ogle, Aksam) detayli bir beslenme plani cikaracaksin.
+Asagida bir hastanin kan tahlili sonuclari veriliyor. Sonuclara gore hastaya 4 farkli gunluk (1. Gun, 2. Gun, 3. Gun, 4. Gun) ve her gun icin 3 ogunluk (Sabah, Ogle, Aksam) detayli bir beslenme plani cikaracaksin.
 
 ÖNEMLİ KURAL 1: Yemek isimlerini (food_name) SADECE aşağıdaki Sabit Yemek Havuzundan seçeceksin. Dışarıdan yemek uydurmak yasaktır!
 Sabit Yemek Havuzu:
@@ -316,9 +317,18 @@ def generate_insight_from_db_results(test_date, results: list, dietary_preferenc
     Veritabanindan cekilmis BloodTestResult nesneleri uzerinden Google Gemini AI analizi yapar.
     """
     lines = [f"Test Tarihi: {test_date}", "-" * 30]
+    abnormal_found = False
     for r in results:
-        ref = r.reference_range if r.reference_range else "Belirtilmemis"
-        lines.append(f"{r.parameter_name}: {r.original_value} {r.unit} (Referans: {ref})")
+        status = get_value_status(r.value, r.reference_range, r.original_value, r.parameter_name)
+        if status in ["high", "low"]:
+            abnormal_found = True
+            ref = r.reference_range if r.reference_range else "Belirtilmemis"
+            durum_tr = "YÜKSEK" if status == "high" else "DÜŞÜK"
+            lines.append(f"[DİKKAT: {durum_tr}] {r.parameter_name}: {r.original_value} {r.unit} (Referans: {ref})")
+            
+    if not abnormal_found:
+        lines.append("Harika! Bu tahlildeki tüm değerler normal referans aralıklarında.")
+        
     formatted_data = "\n".join(lines)
 
     sys_prompt, user_prompt = _build_nutrition_prompts(formatted_data, dietary_preferences)
@@ -339,9 +349,18 @@ def generate_insight_from_db_results(test_date, results: list, dietary_preferenc
 def refresh_single_meal(test_date, results: list, meal_type: str, rejected_food: str, dietary_preferences: list = None) -> MealRecommendation:
     """Tek bir öğünü yenilemek için kullanılır."""
     lines = [f"Test Tarihi: {test_date}", "-" * 30]
+    abnormal_found = False
     for r in results:
-        ref = r.reference_range if r.reference_range else "Belirtilmemis"
-        lines.append(f"{r.parameter_name}: {r.original_value} {r.unit} (Referans: {ref})")
+        status = get_value_status(r.value, r.reference_range, r.original_value, r.parameter_name)
+        if status in ["high", "low"]:
+            abnormal_found = True
+            ref = r.reference_range if r.reference_range else "Belirtilmemis"
+            durum_tr = "YÜKSEK" if status == "high" else "DÜŞÜK"
+            lines.append(f"[DİKKAT: {durum_tr}] {r.parameter_name}: {r.original_value} {r.unit} (Referans: {ref})")
+            
+    if not abnormal_found:
+        lines.append("Harika! Bu tahlildeki tüm değerler normal referans aralıklarında.")
+        
     formatted_data = "\n".join(lines)
     
     allergy_text = ""

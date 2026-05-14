@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Platform } from 'react-native';
 import { useRouter, Link } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { Mail, Lock, LogIn, AlertCircle } from 'lucide-react-native';
@@ -30,8 +30,13 @@ export default function LoginScreen() {
       const response = await api.post('auth/login', params.toString(), {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
       });
+
+      if (Platform.OS === 'web') {
+        localStorage.setItem('token', response.data.access_token);
+      } else {
+        await SecureStore.setItemAsync('token', response.data.access_token);
+      }
       
-      await SecureStore.setItemAsync('token', response.data.access_token);
       router.replace('/dashboard');
     } catch (err) {
       setError('Geçersiz e-posta veya şifre.');
@@ -81,8 +86,8 @@ export default function LoginScreen() {
           />
         </View>
 
-        <TouchableOpacity 
-          style={styles.button} 
+        <TouchableOpacity
+          style={styles.button}
           onPress={handleLogin}
           disabled={loading}
         >
