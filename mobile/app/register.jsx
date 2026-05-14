@@ -90,8 +90,8 @@ export default function RegisterScreen() {
           />
         </View>
 
-        <TouchableOpacity 
-          style={styles.button} 
+        <TouchableOpacity
+          style={styles.button}
           onPress={handleRegister}
           disabled={loading}
         >

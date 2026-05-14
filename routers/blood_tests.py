@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database import get_db
@@ -7,7 +7,11 @@ from models import User
 from services.auth_deps import get_current_user
 from services.analytics import get_value_status
 from services.ai_insight import generate_insight_from_db_results, refresh_single_meal
-from schemas import BloodTestSummary, BloodTestResponse, BloodTestResultResponse, NutritionalInsight, MealRecommendation
+from schemas import (
+    BloodTestSummary, BloodTestResponse, BloodTestResultResponse,
+    NutritionalInsight, MealRecommendation,
+    BloodTestHistoryItem, ParameterTrend, ParameterTrendPoint
+)
 from pydantic import BaseModel
 
 class MealRefreshRequest(BaseModel):
@@ -18,6 +22,59 @@ router = APIRouter(
     prefix="/api/v1/blood-tests",
     tags=["Blood Tests"]
 )
+
+@router.get("/history", response_model=List[BloodTestHistoryItem])
+def get_blood_test_history(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Kullanıcının tüm tahlillerini normal/high/low sayılarıyla listeler."""
+    tests = crud.get_blood_tests_by_user(db, user_id=current_user.id)
+    items = []
+    for t in tests:
+        counts = {"normal": 0, "high": 0, "low": 0}
+        for r in t.results:
+            stat = get_value_status(r.value, r.reference_range, raw_value=r.original_value, parameter_name=r.parameter_name)
+            if stat in counts:
+                counts[stat] += 1
+        items.append(BloodTestHistoryItem(
+            id=t.id,
+            date_taken=t.date_taken,
+            result_count=len(t.results),
+            normal_count=counts["normal"],
+            high_count=counts["high"],
+            low_count=counts["low"],
+        ))
+    return items
+
+
+@router.get("/trends", response_model=List[ParameterTrend])
+def get_trends(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Tüm tahlillerdeki parametrelerin zaman serisi trend verisini döner."""
+    grouped = crud.get_parameter_trends(db, user_id=current_user.id)
+    trends = []
+    for param_name, points in grouped.items():
+        trend_points = []
+        for p in points:
+            status = get_value_status(
+                p["value"], p.get("reference_range"),
+                raw_value=p.get("original_value"),
+                parameter_name=param_name
+            )
+            trend_points.append(ParameterTrendPoint(
+                date=p["date"],
+                value=p["value"],
+                status=status,
+            ))
+        unit = points[0]["unit"] if points else ""
+        trends.append(ParameterTrend(parameter_name=param_name, unit=unit, points=trend_points))
+    # Önce çok noktalı parametreleri göster
+    trends.sort(key=lambda t: len(t.points), reverse=True)
+    return trends
+
 
 @router.get("", response_model=List[BloodTestSummary])
 def list_blood_tests(
@@ -30,6 +87,7 @@ def list_blood_tests(
         BloodTestSummary(id=t.id, date_taken=t.date_taken, result_count=len(t.results))
         for t in tests
     ]
+
 
 @router.get("/{test_id}", response_model=BloodTestResponse)
 def get_blood_test(

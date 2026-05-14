@@ -22,11 +22,15 @@ def update_my_profile(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Giriş yapan kullanıcının adını veya diyet tercihlerini günceller."""
+    """Giriş yapan kullanıcının profil bilgisini günceller."""
     updated = crud.update_user(
         db,
         user=current_user,
         name=body.name,
-        dietary_preferences=body.dietary_preferences
+        dietary_preferences=body.dietary_preferences,
+        age=body.age,
+        weight_kg=body.weight_kg,
+        height_cm=body.height_cm,
+        goal=body.goal,
     )
     return updated

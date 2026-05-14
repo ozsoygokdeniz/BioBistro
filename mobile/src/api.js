@@ -8,9 +8,9 @@ const debuggerHost = Constants.expoConfig?.hostUri || Constants.manifest?.debugg
 const ipAddress = debuggerHost ? debuggerHost.split(':')[0] : '10.52.160.221';
 
 // Use localhost for web, LAN IP for physical device/emulator
-const API_URL = Platform.OS === 'web' 
-  ? 'http://localhost:8005/api/v1/' 
-  : `http://${ipAddress}:8005/api/v1/`;
+const API_URL = Platform.OS === 'web'
+  ? 'http://localhost:8000/api/v1/'
+  : `http://${ipAddress}:8000/api/v1/`;
 
 const api = axios.create({
   baseURL: API_URL,
@@ -18,12 +18,18 @@ const api = axios.create({
 
 api.interceptors.request.use(async (config) => {
   try {
-    const token = await SecureStore.getItemAsync('token');
+    let token = null;
+    if (Platform.OS === 'web') {
+      token = localStorage.getItem('token');
+    } else {
+      token = await SecureStore.getItemAsync('token');
+    }
+    
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
   } catch (err) {
-    console.warn('Error reading token from SecureStore', err);
+    console.warn('Error reading token', err);
   }
   return config;
 });

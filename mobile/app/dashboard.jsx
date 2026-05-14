@@ -1,14 +1,89 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  ActivityIndicator, Alert, Image, Platform, StatusBar
+  ActivityIndicator, Alert, Image, Platform, StatusBar, Modal, TextInput
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import * as DocumentPicker from 'expo-document-picker';
-import { Upload, LogOut, Star, ChevronRight, Leaf } from 'lucide-react-native';
+import { Upload, LogOut, Star, ChevronRight, Leaf, X, Check, Droplets, Droplet, Circle, AlertCircle, AlertTriangle } from 'lucide-react-native';
 import { theme } from '../src/theme';
 import api from '../src/api';
+
+const ICON_MAP = {
+  Milk: Droplet,
+  Wheat: Leaf,
+  Nut: Circle,
+  Fish: Droplets,
+  Egg: Circle,
+  Apple: Leaf,
+  Flame: AlertTriangle,
+  Leaf: Leaf
+};
+
+export const ALLERGY_CATEGORIES = [
+  {
+    id: "dairy",
+    title: "Süt ve Süt Ürünleri",
+    icon: "Milk",
+    description: "Laktoz veya kazein içeren tüm ürünler",
+    options: [
+      { id: "all_dairy", label: "Süt ve Tüm Süt Ürünleri (Kazein)" },
+      { id: "lactose", label: "Laktoz İntoleransı" },
+      { id: "goat_sheep", label: "Keçi / Koyun Sütü Ürünleri" }
+    ]
+  },
+  {
+    id: "gluten",
+    title: "Gluten ve Tahıllar",
+    icon: "Wheat",
+    description: "Çölyak veya çapraz bulaşma riskli tahıllar",
+    options: [
+      { id: "celiac", label: "Gluten Alerjisi / Çölyak" },
+      { id: "oats", label: "Yulaf (Çapraz Bulaşma)" },
+      { id: "corn", label: "Mısır ve Mısır Ürünleri" }
+    ]
+  },
+  {
+    id: "nuts",
+    title: "Kuruyemişler ve Tohumlar",
+    icon: "Nut",
+    description: "Ağaç yemişleri, yer fıstığı ve tohumlar",
+    options: [
+      { id: "all_nuts", label: "Tüm Kuruyemişler" },
+      { id: "peanut", label: "Yer Fıstığı" },
+      { id: "almond", label: "Badem" }
+    ]
+  },
+  {
+    id: "veg_fruits",
+    title: "Sebze, Meyve ve Çapraz Alerjiler",
+    icon: "Apple",
+    description: "Patlıcangiller, histamin salgılayan meyveler",
+    options: [
+      { id: "nightshades", label: "Patlıcangiller (Domates, Patates)" },
+      { id: "latex_fruit", label: "Geç Çiçek Açanlar (Muz, Avokado)" }
+    ]
+  },
+  {
+    id: "special_diets",
+    title: "Özel Diyetler ve Tıbbi Tercihler",
+    icon: "Leaf",
+    description: "FODMAP, Keto, Vegan vb.",
+    options: [
+      { id: "keto", label: "Ketojenik (Keto) Diyet" },
+      { id: "vegan", label: "Vegan / Vejetaryen" }
+    ]
+  }
+];
+
+const AVATAR_SEEDS = ['Felix', 'Aneka', 'Jude', 'Ryker', 'Nolan', 'Oliver', 'Amaya', 'Leo', 'Mia'];
+const getAvatarUrl = (seed) => `https://api.dicebear.com/7.x/micah/png?seed=${seed}&backgroundColor=transparent`;
+
+import BottomNav from '../components/BottomNav';
+
+import { getMealImage } from '../src/imageMap';
 
 const STATUS_BAR_HEIGHT = Platform.OS === 'android' ? StatusBar.currentHeight || 24 : 44;
 
@@ -20,6 +95,13 @@ export default function DashboardScreen() {
   const [fetchingInsight, setFetchingInsight] = useState(false);
   const router = useRouter();
 
+  // Profile Modal State
+  const [profileModalVisible, setProfileModalVisible] = useState(false);
+  const [avatarSeed, setAvatarSeed] = useState('Felix');
+  const [height, setHeight] = useState('');
+  const [weight, setWeight] = useState('');
+  const [allergies, setAllergies] = useState([]);
+
   useEffect(() => {
     fetchProfile();
   }, []);
@@ -28,8 +110,18 @@ export default function DashboardScreen() {
     try {
       const resp = await api.get('users/me');
       setUser(resp.data);
+      if (resp.data.height_cm) setHeight(String(resp.data.height_cm));
+      if (resp.data.weight_kg) setWeight(String(resp.data.weight_kg));
+      if (resp.data.dietary_preferences) setAllergies(resp.data.dietary_preferences);
+      
+      const savedAvatar = await AsyncStorage.getItem('bb_avatar');
+      if (savedAvatar) setAvatarSeed(savedAvatar);
     } catch (err) {
-      await SecureStore.deleteItemAsync('token');
+      if (Platform.OS === 'web') {
+        localStorage.removeItem('token');
+      } else {
+        await SecureStore.deleteItemAsync('token');
+      }
       router.replace('/login');
     } finally {
       setLoading(false);
@@ -43,11 +135,31 @@ export default function DashboardScreen() {
         text: 'Çıkış Yap',
         style: 'destructive',
         onPress: async () => {
-          await SecureStore.deleteItemAsync('token');
+          if (Platform.OS === 'web') {
+            localStorage.removeItem('token');
+          } else {
+            await SecureStore.deleteItemAsync('token');
+          }
           router.replace('/login');
         }
       }
     ]);
+  };
+
+  const handleSaveProfile = async () => {
+    try {
+      const payload = {
+        height_cm: height ? parseFloat(height) : null,
+        weight_kg: weight ? parseFloat(weight) : null,
+        dietary_preferences: allergies
+      };
+      await api.patch('users/me', payload);
+      await AsyncStorage.setItem('bb_avatar', avatarSeed);
+      setUser(prev => ({ ...prev, ...payload }));
+      setProfileModalVisible(false);
+    } catch (err) {
+      Alert.alert('Hata', 'Profil kaydedilemedi.');
+    }
   };
 
   const pickDocument = async () => {
@@ -103,161 +215,313 @@ export default function DashboardScreen() {
   };
 
   const openRecipe = (meal) => {
+    const mealWithLabel = { 
+      ...meal, 
+      test_label: `Tahlil Sonucu: ${new Date().toLocaleDateString('tr-TR')}` 
+    };
     router.push({
       pathname: '/recipe',
-      params: { meal: JSON.stringify(meal) }
+      params: { meal: JSON.stringify(mealWithLabel) }
     });
   };
 
-  if (loading) {
-    return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <Leaf size={36} color={theme.colors.primary} />
-        <ActivityIndicator size="large" color={theme.colors.primary} style={{ marginTop: 16 }} />
-        <Text style={styles.loadingText}>BioBistro yükleniyor...</Text>
-      </View>
-    );
-  }
+  const saveAllRecipes = async () => {
+    if (!insight || !insight.daily_plans) return;
+    
+    try {
+      const storageModule = Platform.OS === 'web' ? window.localStorage : require('@react-native-async-storage/async-storage').default;
+      const data = Platform.OS === 'web' ? storageModule.getItem('bb_saved_recipes') : await storageModule.getItem('bb_saved_recipes');
+      let list = data ? JSON.parse(data) : [];
+      
+      const testLabel = `Tahlil Sonucu: ${new Date().toLocaleDateString('tr-TR')}`;
+      let addedCount = 0;
+
+      insight.daily_plans.forEach(day => {
+        day.meals.forEach(meal => {
+          if (!list.some(r => r.food_name === meal.food_name)) {
+            list.push({ ...meal, id: Date.now() + Math.random(), test_label: testLabel });
+            addedCount++;
+          }
+        });
+      });
+      
+      if (addedCount > 0) {
+        if (Platform.OS === 'web') {
+          storageModule.setItem('bb_saved_recipes', JSON.stringify(list));
+        } else {
+          await storageModule.setItem('bb_saved_recipes', JSON.stringify(list));
+        }
+        Alert.alert('Başarılı', `Tüm menüdeki ${addedCount} yeni tarif kaydedildi.`);
+      } else {
+        Alert.alert('Bilgi', 'Menüdeki tüm tarifler zaten kaydedilmiş.');
+      }
+    } catch (err) {
+      Alert.alert('Hata', 'Tarifler kaydedilemedi.');
+    }
+  };
+
+  // Removed full-screen loading block to fix navigation performance delay
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={{ paddingBottom: 80 }}
-      showsVerticalScrollIndicator={false}
-    >
-      <StatusBar barStyle="dark-content" backgroundColor={theme.colors.background} />
-
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.profileRow}>
-          <Image
-            source={{ uri: `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=5DBB63&color=fff&rounded=true&bold=true` }}
-            style={styles.avatar}
-          />
-          <View>
-            <Text style={styles.greeting}>Merhaba 👋</Text>
-            <Text style={styles.userName}>{user?.name || 'Kullanıcı'}</Text>
-          </View>
-        </View>
-        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-          <LogOut size={18} color={theme.colors.danger} />
-        </TouchableOpacity>
-      </View>
-
-      {/* Hero Section */}
-      <View style={styles.heroSection}>
-        <View style={styles.leafAccent}>
-          <Leaf size={16} color={theme.colors.primary} />
-        </View>
-        <Text style={styles.mainTitle}>Cook <Text style={styles.titleHighlight}>Special</Text></Text>
-        <Text style={styles.mainTitle}>Every Day</Text>
-        <Text style={styles.subtitle}>Tahlil sonuçlarına göre kişiselleştirilmiş beslenme planın</Text>
-      </View>
-
-      {/* Upload Button */}
-      <TouchableOpacity
-        style={[styles.uploadBtn, (uploading || fetchingInsight) && styles.uploadBtnDisabled]}
-        onPress={pickDocument}
-        disabled={uploading || fetchingInsight}
-        activeOpacity={0.85}
+    <>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={{ paddingBottom: 80 }}
+        showsVerticalScrollIndicator={false}
       >
-        {uploading ? (
-          <>
-            <ActivityIndicator color={theme.colors.primary} size="small" />
-            <Text style={styles.uploadBtnText}>PDF Yükleniyor...</Text>
-          </>
-        ) : (
-          <>
-            <View style={styles.uploadIconBg}>
-              <Upload size={18} color={theme.colors.primary} />
-            </View>
-            <Text style={styles.uploadBtnText}>E-Nabız Tahlili Yükle</Text>
-          </>
-        )}
-      </TouchableOpacity>
+        <StatusBar barStyle="dark-content" backgroundColor={theme.colors.background} />
 
-      {/* AI Processing Indicator */}
-      {fetchingInsight && (
-        <View style={styles.aiLoadingCard}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text style={styles.aiLoadingTitle}>Yapay Zeka Analiz Yapıyor</Text>
-          <Text style={styles.aiLoadingSubtitle}>Tahlil sonuçlarına göre 3 günlük menü hazırlanıyor...</Text>
-        </View>
-      )}
-
-      {/* AI Daily Plans */}
-      {insight?.daily_plans && (
-        <View style={styles.plansContainer}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionHeader}>Beslenme Planın</Text>
-            <View style={styles.planBadge}>
-              <Text style={styles.planBadgeText}>3 Günlük</Text>
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.profileRow}>
+            <TouchableOpacity onPress={() => setProfileModalVisible(true)} activeOpacity={0.8} style={styles.avatarContainer}>
+              <Image
+                source={{ uri: getAvatarUrl(avatarSeed) }}
+                style={styles.avatarNew}
+              />
+            </TouchableOpacity>
+            <View>
+              <Text style={styles.greeting}>Merhaba 👋</Text>
+              <Text style={styles.userName}>{user?.name || 'Kullanıcı'}</Text>
             </View>
           </View>
+          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+            <LogOut size={18} color={theme.colors.danger} />
+          </TouchableOpacity>
+        </View>
 
-          {insight.summary ? (
-            <View style={styles.summaryCard}>
-              <Text style={styles.summaryText}>{insight.summary}</Text>
-            </View>
-          ) : null}
+        {/* Hero Section */}
+        <View style={styles.heroSection}>
+          <View style={styles.leafAccent}>
+            <Leaf size={16} color={theme.colors.primary} />
+          </View>
+          <Text style={styles.mainTitle}>Cook <Text style={styles.titleHighlight}>Special</Text></Text>
+          <Text style={styles.mainTitle}>Every Day</Text>
+          <Text style={styles.subtitle}>Tahlil sonuçlarına göre kişiselleştirilmiş beslenme planın</Text>
+        </View>
 
-          {insight.daily_plans.map((day, dIdx) => (
-            <View key={dIdx} style={styles.daySection}>
-              <View style={styles.dayHeaderRow}>
-                <View style={styles.dayDot} />
-                <Text style={styles.dayTitle}>{day.day_name}</Text>
+        {/* Upload Button */}
+        <TouchableOpacity
+          style={[styles.uploadBtn, (uploading || fetchingInsight) && styles.uploadBtnDisabled]}
+          onPress={pickDocument}
+          disabled={uploading || fetchingInsight}
+          activeOpacity={0.85}
+        >
+          {uploading ? (
+            <>
+              <ActivityIndicator color={theme.colors.primary} size="small" />
+              <Text style={styles.uploadBtnText}>PDF Yükleniyor...</Text>
+            </>
+          ) : (
+            <>
+              <View style={styles.uploadIconBg}>
+                <Upload size={18} color={theme.colors.primary} />
               </View>
+              <Text style={styles.uploadBtnText}>E-Nabız Tahlili Yükle</Text>
+            </>
+          )}
+        </TouchableOpacity>
 
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.mealScroll}
-              >
-                {day.meals.map((meal, mIdx) => (
-                  <TouchableOpacity
-                    key={mIdx}
-                    style={styles.mealCard}
-                    onPress={() => openRecipe(meal)}
-                    activeOpacity={0.88}
-                  >
-                    <Image source={{ uri: meal.image_url }} style={styles.mealImage} />
-                    <View style={styles.mealContent}>
-                      <Text style={styles.mealType}>{meal.meal_type}</Text>
-                      <Text style={styles.mealName} numberOfLines={2}>{meal.food_name}</Text>
-                      <View style={styles.mealFooter}>
-                        <Text style={styles.ingredientsCount}>
-                          {meal.ingredients?.length || 0} malzeme
-                        </Text>
-                        <View style={styles.ratingBadge}>
-                          <Star size={13} color={theme.colors.secondary} fill={theme.colors.secondary} />
-                          <Text style={styles.ratingText}>{meal.rating || '5.0'}</Text>
-                        </View>
-                        <View style={styles.goBtn}>
-                          <ChevronRight size={15} color="#FFF" />
+        {/* AI Processing Indicator */}
+        {fetchingInsight && (
+          <View style={styles.aiLoadingCard}>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+            <Text style={styles.aiLoadingTitle}>Yapay Zeka Analiz Yapıyor</Text>
+            <Text style={styles.aiLoadingSubtitle}>Tahlil sonuçlarına göre 3 günlük menü hazırlanıyor...</Text>
+          </View>
+        )}
+
+        {/* AI Daily Plans */}
+        {insight?.daily_plans && (
+          <View style={styles.plansContainer}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionHeader}>Beslenme Planın</Text>
+              <View style={styles.planBadge}>
+                <Text style={styles.planBadgeText}>3 Günlük</Text>
+              </View>
+            </View>
+
+            {insight.summary ? (
+              <View style={styles.summaryCard}>
+                <Text style={styles.summaryText}>{insight.summary}</Text>
+              </View>
+            ) : null}
+
+            {insight.daily_plans.map((day, dIdx) => (
+              <View key={dIdx} style={styles.daySection}>
+                <View style={styles.dayHeaderRow}>
+                  <View style={styles.dayDot} />
+                  <Text style={styles.dayTitle}>{day.day_name}</Text>
+                </View>
+
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.mealScroll}
+                >
+                  {day.meals.map((meal, mIdx) => (
+                    <TouchableOpacity
+                      key={mIdx}
+                      style={styles.mealCard}
+                      onPress={() => openRecipe(meal)}
+                      activeOpacity={0.88}
+                    >
+                      <Image source={getMealImage(meal.image_url)} style={styles.mealImage} />
+                      <View style={styles.mealContent}>
+                        <Text style={styles.mealType}>{meal.meal_type}</Text>
+                        <Text style={styles.mealName} numberOfLines={2}>{meal.food_name}</Text>
+                        <View style={styles.mealFooter}>
+                          <Text style={styles.ingredientsCount}>
+                            {meal.ingredients?.length || 0} malzeme
+                          </Text>
+                          <View style={styles.ratingBadge}>
+                            <Star size={13} color={theme.colors.secondary} fill={theme.colors.secondary} />
+                            <Text style={styles.ratingText}>{meal.rating || '5.0'}</Text>
+                          </View>
+                          <View style={styles.goBtn}>
+                            <ChevronRight size={15} color="#FFF" />
+                          </View>
                         </View>
                       </View>
-                    </View>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            ))}
+
+            {/* Save All Button */}
+            <TouchableOpacity 
+              style={[styles.uploadBtn, { marginBottom: theme.spacing.xl, marginTop: theme.spacing.s, backgroundColor: theme.colors.primaryBg, borderColor: theme.colors.primary }]} 
+              onPress={saveAllRecipes}
+              activeOpacity={0.85}
+            >
+              <View style={[styles.uploadIconBg, { backgroundColor: theme.colors.primary }]}>
+                <Star size={18} color="#FFF" />
+              </View>
+              <Text style={[styles.uploadBtnText, { color: theme.colors.primary }]}>Tüm Tarifleri Kaydet</Text>
+            </TouchableOpacity>
+
+          </View>
+        )}
+
+        {/* Empty State */}
+        {!insight && !fetchingInsight && !uploading && (
+          <View style={styles.emptyState}>
+            <View style={styles.emptyIconBg}>
+              <Leaf size={40} color={theme.colors.primary} />
+            </View>
+            <Text style={styles.emptyTitle}>Tahlilini Yükle</Text>
+            <Text style={styles.emptySubtitle}>
+              E-Nabız'dan indirdiğin kan tahlili PDF'ini yükle, yapay zeka sana özel 3 günlük beslenme planı hazırlasın.
+            </Text>
+          </View>
+        )}
+
+        {/* Profile Settings Modal */}
+        <Modal visible={profileModalVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleSaveProfile}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Profil ve Sağlık Ayarları</Text>
+              <TouchableOpacity onPress={handleSaveProfile} style={styles.modalCloseBtn}>
+                <Text style={styles.saveBtnText}>Kaydet</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView contentContainerStyle={styles.modalScroll}>
+              <Text style={styles.inputLabel}>Avatarını Seç (Memoji)</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.avatarScroll}>
+                {AVATAR_SEEDS.map(seed => (
+                  <TouchableOpacity
+                    key={seed}
+                    onPress={() => setAvatarSeed(seed)}
+                    style={[styles.avatarOption, avatarSeed === seed && styles.avatarOptionSelected]}
+                  >
+                    <Image source={{ uri: getAvatarUrl(seed) }} style={styles.avatarOptionImg} />
+                    {avatarSeed === seed && (
+                      <View style={styles.avatarCheck}>
+                        <Check size={12} color="#FFF" />
+                      </View>
+                    )}
                   </TouchableOpacity>
                 ))}
               </ScrollView>
-            </View>
-          ))}
-        </View>
-      )}
 
-      {/* Empty State */}
-      {!insight && !fetchingInsight && !uploading && (
-        <View style={styles.emptyState}>
-          <View style={styles.emptyIconBg}>
-            <Leaf size={40} color={theme.colors.primary} />
+              <Text style={styles.inputLabel}>Boy Kilo Endeksi İçin Veriler</Text>
+              <View style={styles.inputRow}>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputSubLabel}>Boy (cm)</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={height}
+                    onChangeText={setHeight}
+                    keyboardType="numeric"
+                    placeholder="175"
+                  />
+                </View>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputSubLabel}>Kilo (kg)</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={weight}
+                    onChangeText={setWeight}
+                    keyboardType="numeric"
+                    placeholder="70"
+                  />
+                </View>
+              </View>
+
+              <Text style={styles.inputLabel}>Ulusal Alerji ve Diyet Anketi</Text>
+              <Text style={styles.inputDesc}>Yemek eleme algoritması için sahip olduğunuz alerjileri ve diyetleri işaretleyin.</Text>
+              
+              <View style={styles.allergiesContainer}>
+                {ALLERGY_CATEGORIES.map(category => {
+                  const Icon = ICON_MAP[category.icon] || Leaf;
+                  return (
+                    <View key={category.id} style={styles.allergyCategory}>
+                      <View style={styles.allergyCategoryHeader}>
+                        <Icon size={18} color={theme.colors.primary} />
+                        <View style={{ marginLeft: 8 }}>
+                          <Text style={styles.allergyCategoryTitle}>{category.title}</Text>
+                          <Text style={styles.allergyCategoryDesc}>{category.description}</Text>
+                        </View>
+                      </View>
+                      <View style={styles.allergyOptions}>
+                        {category.options.map(option => {
+                          const isSelected = allergies.includes(option.label);
+                          return (
+                            <TouchableOpacity
+                              key={option.id}
+                              style={[styles.allergyOption, isSelected && styles.allergyOptionSelected]}
+                              activeOpacity={0.7}
+                              onPress={() => {
+                                if (isSelected) {
+                                  setAllergies(allergies.filter(a => a !== option.label));
+                                } else {
+                                  setAllergies([...allergies, option.label]);
+                                }
+                              }}
+                            >
+                              <View style={[styles.allergyCheckbox, isSelected && styles.allergyCheckboxSelected]}>
+                                {isSelected && <Check size={12} color="#FFF" />}
+                              </View>
+                              <Text style={[styles.allergyOptionText, isSelected && styles.allergyOptionTextSelected]}>
+                                {option.label}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            </ScrollView>
           </View>
-          <Text style={styles.emptyTitle}>Tahlilini Yükle</Text>
-          <Text style={styles.emptySubtitle}>
-            E-Nabız'dan indirdiğin kan tahlili PDF'ini yükle, yapay zeka sana özel 3 günlük beslenme planı hazırlasın.
-          </Text>
-        </View>
-      )}
-    </ScrollView>
+        </Modal>
+
+      </ScrollView>
+      <BottomNav />
+    </>
   );
 }
 
@@ -280,12 +544,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: theme.spacing.s,
   },
-  avatar: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+  avatarContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#F3F4F6',
+    marginRight: 16,
+    overflow: 'hidden',
     borderWidth: 2,
-    borderColor: theme.colors.primary,
+    borderColor: theme.colors.primaryLight,
+  },
+  avatarNew: {
+    width: '100%',
+    height: '100%',
   },
   greeting: {
     fontSize: 12,
@@ -557,5 +828,173 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     fontSize: 14,
     lineHeight: 22,
+  },
+  
+  // Modal Styles
+  modalContainer: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    paddingTop: Platform.OS === 'android' ? STATUS_BAR_HEIGHT + 20 : 60,
+    backgroundColor: theme.colors.glassBg,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.glassBorder,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: theme.colors.text,
+  },
+  modalCloseBtn: {
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  saveBtnText: {
+    color: '#FFF',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  modalScroll: {
+    padding: 20,
+    paddingBottom: 80,
+  },
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: theme.colors.text,
+    marginBottom: 8,
+    marginTop: 16,
+  },
+  inputDesc: {
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+    marginBottom: 12,
+    lineHeight: 18,
+  },
+  inputSubLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.colors.textSecondary,
+    marginBottom: 6,
+  },
+  input: {
+    backgroundColor: theme.colors.glassBg,
+    borderWidth: 1,
+    borderColor: theme.colors.glassBorder,
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 15,
+    color: theme.colors.text,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  inputGroup: {
+    flex: 1,
+  },
+  avatarScroll: {
+    paddingVertical: 8,
+    marginBottom: 10,
+  },
+  avatarOption: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: '#F3F4F6',
+    marginRight: 12,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    overflow: 'hidden',
+  },
+  avatarOptionSelected: {
+    borderColor: theme.colors.primary,
+  },
+  avatarOptionImg: {
+    width: '100%',
+    height: '100%',
+  },
+  avatarCheck: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    backgroundColor: theme.colors.primary,
+    borderRadius: 10,
+    padding: 2,
+  },
+  allergiesContainer: {
+    marginTop: 8,
+  },
+  allergyCategory: {
+    backgroundColor: theme.colors.glassBg,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.glassBorder,
+    ...theme.shadows.small,
+  },
+  allergyCategoryHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  allergyCategoryTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: theme.colors.text,
+  },
+  allergyCategoryDesc: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+    marginTop: 2,
+  },
+  allergyOptions: {
+    gap: 8,
+  },
+  allergyOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: theme.colors.background,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: theme.colors.glassBorder,
+  },
+  allergyOptionSelected: {
+    backgroundColor: theme.colors.primaryBg,
+    borderColor: theme.colors.primaryLight,
+  },
+  allergyCheckbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: theme.colors.textMuted,
+    marginRight: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  allergyCheckboxSelected: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+  },
+  allergyOptionText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: theme.colors.text,
+    flex: 1,
+  },
+  allergyOptionTextSelected: {
+    color: theme.colors.primaryHover,
+    fontWeight: '600',
   },
 });

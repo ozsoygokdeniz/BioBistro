@@ -49,7 +49,7 @@ class NutritionalInsight(BaseModel):
 
     summary: str = Field(..., description="Tıbbi analiz ve kan değerlerindeki genel tablonun özeti")
     potential_deficiencies: List[str] = Field(default=[], description="Eksik veya düşük olan vitamin/mineral isimleri")
-    daily_plans: List[DailyPlan] = Field(default=[], description="3 farklı gün için detaylı öğün planı")
+    daily_plans: List[DailyPlan] = Field(default=[], description="4 farklı gün için detaylı öğün planı")
     foods_to_avoid: List[str] = Field(default=[], description="Kaçınılması veya azaltılması gereken yiyecek grupları")
     general_advice: List[str] = Field(default=[], description="Yaşam tarzı ve genel sağlık tavsiyeleri")
 
@@ -66,6 +66,10 @@ class UserResponse(BaseModel):
     name: str
     email: str
     dietary_preferences: List[str]
+    age: Optional[int] = None
+    weight_kg: Optional[float] = None
+    height_cm: Optional[float] = None
+    goal: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -105,3 +109,34 @@ class BloodTestSummary(BaseModel):
 class UserUpdate(BaseModel):
     name: Optional[str] = None
     dietary_preferences: Optional[List[str]] = None
+    age: Optional[int] = None
+    weight_kg: Optional[float] = None
+    height_cm: Optional[float] = None
+    goal: Optional[str] = None
+
+
+# --- Trend / History Schemas ---
+
+class ParameterTrendPoint(BaseModel):
+    """Tek bir tarih-değer noktası"""
+    date: date
+    value: float
+    status: str  # normal / high / low
+
+    model_config = ConfigDict(from_attributes=True)
+
+class ParameterTrend(BaseModel):
+    """Bir parametrenin tüm tarihsel seyri"""
+    parameter_name: str
+    unit: str
+    points: List[ParameterTrendPoint]
+
+class BloodTestHistoryItem(BaseModel):
+    id: int
+    date_taken: date
+    result_count: int
+    normal_count: int
+    high_count: int
+    low_count: int
+
+    model_config = ConfigDict(from_attributes=True)

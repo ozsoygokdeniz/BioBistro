@@ -6,6 +6,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronLeft, Heart, Clock, Zap, Star, ChefHat } from 'lucide-react-native';
 import { theme } from '../src/theme';
+import { getMealImage } from '../src/imageMap';
 
 const STATUS_BAR_HEIGHT = Platform.OS === 'android' ? StatusBar.currentHeight || 24 : 44;
 
@@ -20,12 +21,51 @@ export default function RecipeScreen() {
   const router = useRouter();
   const { meal: mealParam } = useLocalSearchParams();
 
+  const [isSaved, setIsSaved] = React.useState(false);
+
   let meal = null;
   try {
     if (mealParam) meal = JSON.parse(mealParam);
   } catch (err) {
     console.error('Failed to parse meal data');
   }
+
+  React.useEffect(() => {
+    if (meal) checkIfSaved();
+  }, [meal?.food_name]);
+
+  const checkIfSaved = async () => {
+    try {
+      const storageModule = Platform.OS === 'web' ? window.localStorage : require('@react-native-async-storage/async-storage').default;
+      const data = Platform.OS === 'web' ? storageModule.getItem('bb_saved_recipes') : await storageModule.getItem('bb_saved_recipes');
+      if (data) {
+        const list = JSON.parse(data);
+        setIsSaved(list.some(r => r.food_name === meal.food_name));
+      }
+    } catch (err) { }
+  };
+
+  const toggleSave = async () => {
+    try {
+      const storageModule = Platform.OS === 'web' ? window.localStorage : require('@react-native-async-storage/async-storage').default;
+      const data = Platform.OS === 'web' ? storageModule.getItem('bb_saved_recipes') : await storageModule.getItem('bb_saved_recipes');
+      let list = data ? JSON.parse(data) : [];
+
+      if (isSaved) {
+        list = list.filter(r => r.food_name !== meal.food_name);
+      } else {
+        const newMeal = { ...meal, id: Date.now() };
+        list.push(newMeal);
+      }
+
+      if (Platform.OS === 'web') {
+        storageModule.setItem('bb_saved_recipes', JSON.stringify(list));
+      } else {
+        await storageModule.setItem('bb_saved_recipes', JSON.stringify(list));
+      }
+      setIsSaved(!isSaved);
+    } catch (err) { }
+  };
 
   if (!meal) {
     return (
@@ -48,7 +88,7 @@ export default function RecipeScreen() {
       {/* Hero Image */}
       <View style={styles.heroSection}>
         <View style={[styles.imageBg, { backgroundColor: theme.colors.primaryBg }]}>
-          <Image source={{ uri: meal.image_url }} style={styles.heroImage} />
+          <Image source={getMealImage(meal.image_url)} style={styles.heroImage} />
         </View>
 
         {/* Top Controls */}
@@ -56,8 +96,8 @@ export default function RecipeScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn}>
             <ChevronLeft size={24} color={theme.colors.text} />
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.iconBtn, styles.heartBtn]}>
-            <Heart size={20} color={theme.colors.danger} fill={theme.colors.danger} />
+          <TouchableOpacity style={[styles.iconBtn, styles.heartBtn]} onPress={toggleSave}>
+            <Heart size={20} color={theme.colors.danger} fill={isSaved ? theme.colors.danger : "transparent"} />
           </TouchableOpacity>
         </View>
 
@@ -144,11 +184,24 @@ export default function RecipeScreen() {
           </View>
         ) : null}
 
-        {/* CTA Button */}
-        <TouchableOpacity style={styles.ctaBtn} activeOpacity={0.85}>
-          <ChefHat size={20} color="#FFF" />
-          <Text style={styles.ctaBtnText}>Pişirmeye Başla</Text>
-        </TouchableOpacity>
+        {/* Actions Row */}
+        <View style={styles.actionsRow}>
+          <TouchableOpacity style={[styles.ctaBtn, { flex: 1 }]} activeOpacity={0.85}>
+            <ChefHat size={20} color="#FFF" />
+            <Text style={styles.ctaBtnText}>Pişirmeye Başla</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.saveActionBtn, isSaved && styles.saveActionBtnActive]} 
+            onPress={toggleSave}
+            activeOpacity={0.85}
+          >
+            <Heart size={20} color={isSaved ? "#FFF" : theme.colors.primary} fill={isSaved ? "#FFF" : "transparent"} />
+            <Text style={[styles.saveActionText, isSaved && { color: '#FFF' }]}>
+              {isSaved ? 'Kaydedildi' : 'Kaydet'}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={{ height: 40 }} />
       </View>
@@ -412,6 +465,11 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     lineHeight: 20,
   },
+  actionsRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.m,
+    marginBottom: theme.spacing.m,
+  },
   ctaBtn: {
     backgroundColor: theme.colors.primary,
     height: 56,
@@ -425,6 +483,27 @@ const styles = StyleSheet.create({
   ctaBtnText: {
     color: '#FFFFFF',
     fontSize: 17,
+    fontWeight: '700',
+  },
+  saveActionBtn: {
+    backgroundColor: theme.colors.primaryBg,
+    height: 56,
+    paddingHorizontal: theme.spacing.l,
+    borderRadius: theme.borderRadius.full,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: theme.spacing.s,
+    borderWidth: 2,
+    borderColor: theme.colors.primaryLight,
+  },
+  saveActionBtnActive: {
+    backgroundColor: theme.colors.danger,
+    borderColor: theme.colors.danger,
+  },
+  saveActionText: {
+    color: theme.colors.primary,
+    fontSize: 16,
     fontWeight: '700',
   },
 });

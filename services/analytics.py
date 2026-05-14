@@ -12,7 +12,27 @@ _KNOWN_RANGES: dict[str, Tuple[Optional[float], Optional[float]]] = {
     "ph":                   (4.5,   8.0),
     # PCT (trombosit çökme oranı)
     "pct":                  (0.10,  0.28),
-    # Diğer yaygın parametreler referansı eksik gelebilir
+    # GFR
+    "gfr(ckd-epi)":         (90.0,  None),
+    "gfr(ckd-epi̇)":         (90.0,  None),
+    "gfr(ckd-epı)":         (90.0,  None),
+    "egfr":                 (90.0,  None),
+    # İdrar mikroskopi sediment hücreleri (genelde 0-5 arası normal)
+    "yassı epitel":         (None,  5.0),
+    "yassi epitel":         (None,  5.0),
+    "lokosit (mikroskopi)": (None,  5.0),
+    "lökosit (mikroskopi)": (None,  5.0),
+    "eritrosit - (mikroskopi)": (None,  3.0),
+    # Diğer idrar mikroskopi parametreleri (0 olması normaldir)
+    "bakteri":              (None, 0.0),
+    "amorf kristaller":     (None, 0.0),
+    "granüler silendir":    (None, 0.0),
+    "hyalin silendir":      (None, 0.0),
+    "kalsiyum okzelat kristalleri": (None, 0.0),
+    "maya hücresi":         (None, 0.0),
+    "renal epitel":         (None, 0.0),
+    "triple fosfat kristali": (None, 0.0),
+    "ürik asit kristali":   (None, 0.0),
 }
 
 # Nitel referans aralıkları → (expected_normal_values: set, abnormal_high_values: set)
@@ -22,14 +42,20 @@ _QUALITATIVE_NORMAL = {
     "normal",
     "açık sarı", "acik sari", "sarı", "sari",          # renk
     "berrak", "clear",                                  # görünüm
+    "görülmedi", "gorulmedi", "yok", "nadir",           # mikroskopi
 }
 _QUALITATIVE_HIGH = {
     "pos", "pozitif", "positive",
     "1+", "2+", "3+", "4+",                            # yarı kantitatif
-    "trace", "iz",
+    "+", "++", "+++", "++++",
+    "trace", "iz", "eser", "bol",                      # miktar
+    "bulanık", "bulanik", "kırmızı", "kirmizi", "kanlı", "kanli" # anormal görünüm
 }
 
 
+from functools import lru_cache
+
+@lru_cache(maxsize=2048)
 def _parse_reference_range(ref_str: str) -> Tuple[Optional[float], Optional[float]]:
     """
     '10 - 120', '> 50', '< 1.2', '6,5 - 12' gibi referans aralıklarını ayırır
@@ -40,19 +66,25 @@ def _parse_reference_range(ref_str: str) -> Tuple[Optional[float], Optional[floa
 
     ref_str = ref_str.strip().replace(',', '.')
 
-    match_gt = re.match(r'^>\s*([\d.]+)$', ref_str)
+    match_gt = re.search(r'[>≥]\s*([\d.]+)', ref_str)
     if match_gt:
         return float(match_gt.group(1)), None
 
-    match_lt = re.match(r'^<\s*([\d.]+)$', ref_str)
+    match_lt = re.search(r'[<≤]\s*([\d.]+)', ref_str)
     if match_lt:
         return None, float(match_lt.group(1))
 
-    match_range = re.match(r'^([\d.]+)\s*[-–]\s*([\d.]+)$', ref_str)
+    match_range = re.search(r'([\d.]+)\s*[-–]\s*([\d.]+)', ref_str)
     if match_range:
         return float(match_range.group(1)), float(match_range.group(2))
 
     return None, None
+
+
+def _normalize_text(text: str) -> str:
+    if not text:
+        return ""
+    return text.replace("İ", "i").replace("I", "ı").lower().strip()
 
 
 def _qualitative_status(raw_value: str) -> Optional[str]:
@@ -60,7 +92,7 @@ def _qualitative_status(raw_value: str) -> Optional[str]:
     'Neg', '1+', 'Normal', 'Açık Sarı' gibi metin değerleri için durum döner.
     Tanımlanamıyorsa None döner (çağıran devam eder).
     """
-    v = raw_value.strip().lower()
+    v = _normalize_text(raw_value)
     if v in _QUALITATIVE_NORMAL:
         return "normal"
     if v in _QUALITATIVE_HIGH:
@@ -102,7 +134,7 @@ def get_value_status(
 
     # --- 3. Referans yok ama parametre dahili tabloda var ---
     if numeric_value is not None and parameter_name:
-        key = parameter_name.strip().lower()
+        key = _normalize_text(parameter_name)
         if key in _KNOWN_RANGES:
             low, high = _KNOWN_RANGES[key]
             if low is not None and numeric_value < low:
@@ -113,7 +145,8 @@ def get_value_status(
 
     # --- 4. Sıfır değerli mikroskopi/sediment parametresi ---
     # (Amorf Kristaller, Bakteri, Granüler Silendir vb. — 0 ise her zaman normal)
-    if numeric_value == 0.0 and not reference_range:
-        return "normal"
+    if numeric_value == 0.0:
+        if not reference_range or reference_range.strip().lower() in ["-", "nadir", "yok", ""]:
+            return "normal"
 
     return "unknown"

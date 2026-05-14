@@ -1,91 +1,81 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Activity, LogOut, LayoutDashboard, User } from 'lucide-react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 
 const Navbar = () => {
   const navigate = useNavigate();
-  const isAuthenticated = !!localStorage.getItem('token');
+  const location = useLocation();
+  const isAuth = !!localStorage.getItem('token');
+
+  // Giriş/Kayıt sayfalarında navbar gösterme
+  const hideNav = ['/login', '/register'].includes(location.pathname);
+  if (hideNav) return null;
 
   const handleLogout = () => {
     localStorage.removeItem('token');
     navigate('/login');
   };
 
-  return (
-    <nav style={{
-      margin: '16px 20px',
-      padding: '14px 28px',
-      position: 'sticky',
-      top: '16px',
-      zIndex: 100,
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      background: 'rgba(255,255,255,0.90)',
-      backdropFilter: 'blur(16px)',
-      WebkitBackdropFilter: 'blur(16px)',
-      border: '1px solid var(--glass-border)',
-      borderRadius: '20px',
-      boxShadow: '0 4px 20px rgba(93,187,99,0.10)',
-    }}>
-      {/* Logo */}
-      <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', color: 'inherit' }}>
-        <div style={{
-          width: 40, height: 40, borderRadius: 12,
-          background: 'linear-gradient(135deg, var(--primary), var(--primary-dark))',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 4px 12px rgba(93,187,99,0.30)',
-        }}>
-          <Activity size={22} color="#fff" />
-        </div>
-        <span className="heading" style={{ fontSize: '1.35rem' }}>
-          Bio<span style={{ color: 'var(--primary)' }}>Bistro</span>
-        </span>
+  const NavLink = ({ to, label }) => {
+    const active = location.pathname === to;
+    return (
+      <Link to={to} className={`bb-nav-link${active ? ' active' : ''}`}>
+        {label}
       </Link>
+    );
+  };
 
-      {/* Nav Links */}
-      <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
-        {isAuthenticated ? (
-          <>
-            <Link to="/dashboard" className="nav-link" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <LayoutDashboard size={17} />
-              <span>Panel</span>
-            </Link>
-            <Link to="/onboarding" className="nav-link" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <User size={17} />
-              <span>Profil / Alerjiler</span>
-            </Link>
-            <button
-              onClick={handleLogout}
-              style={{
-                background: 'var(--danger-bg)',
-                border: '1.5px solid transparent',
-                borderRadius: 10,
-                color: 'var(--danger)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                fontWeight: '600',
-                fontSize: '14px',
-                padding: '8px 14px',
-                transition: 'all 0.2s',
-              }}
-            >
-              <LogOut size={16} />
-              <span>Çıkış</span>
-            </button>
-          </>
-        ) : (
-          <>
-            <Link to="/login" className="nav-link">Giriş Yap</Link>
-            <Link to="/register" className="btn btn-primary" style={{ padding: '10px 20px', textDecoration: 'none', fontSize: '14px' }}>
-              Kaydol
-            </Link>
-          </>
-        )}
+  return (
+    <header className="bb-nav">
+      <div className="bb-nav-inner">
+
+        {/* Sol: Logo + Navigasyon */}
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <Link to="/" className="bb-logo">BIOBISTRO</Link>
+          {isAuth && (
+            <nav className="bb-nav-links">
+              <NavLink to="/dashboard" label="Dashboard" />
+              <NavLink to="/history" label="Tahlil Sonuçları" />
+              <NavLink to="/saved-recipes" label="Kayıtlı Tarifler" />
+            </nav>
+          )}
+        </div>
+
+        {/* Sağ: Profil + Çıkış */}
+        <div className="bb-nav-actions">
+          {isAuth ? (
+            <>
+              <Link
+                to="/profile"
+                className="bb-icon-btn"
+                title="Profil"
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 8, fontSize: 14, fontWeight: 600, color: 'var(--secondary)', textDecoration: 'none', transition: 'all 0.2s', width: 'auto' }}
+                onMouseOver={e => { e.currentTarget.style.color = 'var(--primary)'; e.currentTarget.style.background = 'rgba(0,109,47,0.06)'; }}
+                onMouseOut={e => { e.currentTarget.style.color = 'var(--secondary)'; e.currentTarget.style.background = 'none'; }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 20 }}>account_circle</span>
+                Profil
+              </Link>
+              <button
+                onClick={handleLogout}
+                title="Çıkış Yap"
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 8, fontSize: 14, fontWeight: 600, border: 'none', cursor: 'pointer', background: 'none', color: 'var(--secondary)', transition: 'all 0.2s' }}
+                onMouseOver={e => { e.currentTarget.style.color = 'var(--error)'; e.currentTarget.style.background = 'rgba(186,26,26,0.07)'; }}
+                onMouseOut={e => { e.currentTarget.style.color = 'var(--secondary)'; e.currentTarget.style.background = 'none'; }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 20 }}>logout</span>
+                Çıkış
+              </button>
+            </>
+          ) : (
+            <>
+              <Link to="/login" className="bb-btn bb-btn-ghost" style={{ padding: '8px 18px' }}>Giriş Yap</Link>
+              <Link to="/register" className="bb-btn bb-btn-primary" style={{ padding: '9px 20px' }}>Kaydol</Link>
+            </>
+          )}
+        </div>
+
       </div>
-    </nav>
+    </header>
   );
 };
 

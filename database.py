@@ -8,11 +8,13 @@ load_dotenv()
 # .env'den Supabase bağlantısını al
 SQLALCHEMY_DATABASE_URL = os.getenv("ALEMBIC_DB_URL", os.getenv("SUPABASE_DB_URL"))
 
-from sqlalchemy.pool import NullPool
-
+# NullPool yerine standart havuzlama ve pre-ping kullanıyoruz (Kopmaları önlemek için)
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
-    poolclass=NullPool  # Supabase/PgBouncer için en güvenli havuzlama yöntemi
+    pool_pre_ping=True,
+    pool_recycle=1800,
+    pool_size=10,
+    max_overflow=20
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
