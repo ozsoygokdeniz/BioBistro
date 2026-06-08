@@ -38,7 +38,7 @@ class Allergy(Base):
 class BloodTest(Base):
     __tablename__ = 'blood_tests'
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
     date_taken = Column(DateTime, nullable=False)
     pdf_url = Column(String, nullable=True) # İsteğe bağlı, kaydedilen PDF'in linki
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
@@ -49,7 +49,7 @@ class BloodTest(Base):
 class BloodTestResult(Base):
     __tablename__ = 'blood_test_results'
     id = Column(Integer, primary_key=True, index=True)
-    blood_test_id = Column(Integer, ForeignKey('blood_tests.id'), nullable=False)
+    blood_test_id = Column(Integer, ForeignKey('blood_tests.id'), nullable=False, index=True)
     parameter_name = Column(String, nullable=False) # örn. "Ferritin"
     value = Column(Float, nullable=True) # Normalize edilmiş değer
     original_value = Column(String, nullable=False) # PDF'ten çıkarılan orijinal metin

@@ -10,7 +10,7 @@ from services.ai_insight import generate_nutritional_insight
 from services.auth_deps import get_current_user
 from core.logging_middleware import LoggingMiddleware
 from schemas import BloodTestExtraction, NutritionalInsight
-from routers import auth, blood_tests, users
+from routers import auth, blood_tests, users, food_scan
 
 app = FastAPI(
     title="BioBistro API",
@@ -43,6 +43,7 @@ app.add_middleware(LoggingMiddleware)
 app.include_router(auth.router)
 app.include_router(blood_tests.router)
 app.include_router(users.router)
+app.include_router(food_scan.router)
 
 # Mobil ve Web tarafında resimlerin yüklenebilmesi için static klasörünü sunuyoruz
 from fastapi.staticfiles import StaticFiles

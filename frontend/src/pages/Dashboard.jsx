@@ -328,7 +328,7 @@ const Dashboard = () => {
         {fetchingInsight ? (
           <div style={{ textAlign: 'center', padding: '40px 0' }}>
             <span className="material-symbols-outlined bb-spin" style={{ fontSize: 36, color: 'var(--primary)', display: 'block', margin: '0 auto 12px' }}>progress_activity</span>
-            <p style={{ color: 'var(--secondary)', fontSize: 15 }}>Gemini tahlillerini yorumluyor…</p>
+            <p style={{ color: 'var(--secondary)', fontSize: 15 }}>Değerlerine göre yapay zeka analizi yapılıyor…</p>
             <p style={{ color: 'var(--outline)', fontSize: 13, marginTop: 6 }}>Bu işlem birkaç saniye sürebilir.</p>
           </div>
         ) : insight ? (

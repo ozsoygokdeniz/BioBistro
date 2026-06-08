@@ -208,7 +208,8 @@ export default function DashboardScreen() {
       const resp = await api.post(`blood-tests/${testId}/insights`);
       setInsight(resp.data);
     } catch (err) {
-      Alert.alert('Hata', 'AI analizi şu an yapılamıyor. Lütfen tekrar deneyin.');
+      const errorMessage = err?.message || 'Bilinmeyen Hata';
+      Alert.alert('Hata', `AI analizi yapılamıyor. Detay: ${errorMessage}`);
     } finally {
       setFetchingInsight(false);
     }

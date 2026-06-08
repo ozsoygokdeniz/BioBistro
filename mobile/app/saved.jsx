@@ -80,7 +80,13 @@ export default function SavedRecipesScreen() {
                 activeOpacity={0.8}
                 onPress={() => openRecipe(recipe)}
               >
-                <Image source={getMealImage(recipe.image_url)} style={styles.image} />
+                <Image
+                  source={getMealImage(recipe.image_url)}
+                  style={styles.image}
+                  resizeMode="cover"
+                  resizeMethod="scale"
+                  fadeDuration={0}
+                />
                 <View style={styles.content}>
                   <Text style={styles.type}>{recipe.meal_type}</Text>
                   <Text style={styles.name} numberOfLines={2}>{recipe.food_name}</Text>
@@ -179,11 +185,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
+    height: 150,
   },
   image: {
-    width: 100,
-    height: '100%',
-    backgroundColor: '#eee',
+    width: 160,
+    height: 150,
+    backgroundColor: '#F5F5F5',
   },
   content: {
     flex: 1,
@@ -213,5 +220,6 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
   },
 });
+
 
 

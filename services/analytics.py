@@ -100,6 +100,7 @@ def _qualitative_status(raw_value: str) -> Optional[str]:
     return None
 
 
+@lru_cache(maxsize=4096)
 def get_value_status(
     numeric_value: Optional[float],
     reference_range: Optional[str],

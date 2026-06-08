@@ -242,7 +242,7 @@ export const DashboardHero = ({ userName }) => (
               display: 'block',
             }}
           />
-        </span>{' '}👋
+        </span>
       </h1>
 
       <p style={{ color: 'var(--secondary)', fontSize: 17, lineHeight: 1.6, maxWidth: 560 }}>

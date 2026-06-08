@@ -174,14 +174,14 @@ def _get_gemini_response(system_prompt: str, user_prompt: str) -> str:
 
     client = genai.Client(api_key=api_key)
 
-    # Oncelikli model, erisim sorunu olursa yedek
-    models_to_try = ["gemini-2.5-flash", "gemini-2.0-flash"]
+    # Oncelikli model, erisim sorunu olursa yedek (Hızlı yanıt için kotası olanları öne aldım)
+    models_to_try = ["gemini-2.0-flash", "gemini-3.5-flash", "gemini-3.1-pro-preview", "gemini-2.5-flash"]
     last_error = None
 
     for model_name in models_to_try:
-        for attempt in range(4):
+        for attempt in range(3):
             try:
-                logger.info(f"AI analizi: {model_name} (deneme {attempt + 1}/4)")
+                logger.info(f"AI analizi: {model_name} (deneme {attempt + 1}/3)")
                 response = client.models.generate_content(
                     model=model_name,
                     contents=user_prompt,
@@ -204,18 +204,21 @@ def _get_gemini_response(system_prompt: str, user_prompt: str) -> str:
                 logger.warning(f"Gemini Hata [{model_name}] (deneme {attempt + 1}): {err_str[:200]}")
 
                 if '503' in err_str or 'UNAVAILABLE' in err_str or 'high demand' in err_str.lower():
-                    wait_sec = 8 * (attempt + 1)
+                    wait_sec = 3 * (attempt + 1)
                     logger.info(f"503 alindi, {wait_sec}s bekleniyor...")
                     time.sleep(wait_sec)
                     continue
-                elif '429' in err_str or 'quota' in err_str.lower() or 'RESOURCE_EXHAUSTED' in err_str:
-                    time.sleep(10)
+                elif '429' in err_str or 'RESOURCE_EXHAUSTED' in err_str:
+                    if 'exceeded your current quota' in err_str.lower():
+                        logger.error(f"API Kotası Doldu ({model_name})!")
+                        break  # Bu model icin kotamiz doldu, sonraki modele gec
+                    time.sleep(5)
                     continue
                 elif '404' in err_str or 'NOT_FOUND' in err_str:
                     logger.warning(f"{model_name} 404 aldi, yedek modele geciliyor...")
                     break  # ic donguyu kirarak sonraki model_name'e gec
                 else:
-                    time.sleep(3)
+                    time.sleep(2)
         else:
             logger.warning(f"{model_name} icin tum denemeler basarisiz, yedek modele geciliyor...")
 
