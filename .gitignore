@@ -20,6 +20,7 @@ venv.bak/
 *.log
 *.txt
 *.pdf
+!requirements.txt
 
 # Alembic
 # alembic.ini # alembic.ini'yi göndermek isteyebiliriz ama içindeki şifreyi .env'den okuttuğumuz için güvenli
