@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session, selectinload
-from models import User, BloodTest, BloodTestResult
+from models import User, BloodTest, BloodTestResult, SavedRecipe
 from schemas import BloodTestExtraction, UserCreate
 from core.security import get_password_hash
 
@@ -125,3 +125,38 @@ def get_parameter_trends(db: Session, user_id: int):
     
     # En az 2 veri noktası olmadan trend anlamlı değil — tek ölçüm düz çizgi gösterir
     return {name: points for name, points in grouped.items() if len(points) >= 2}
+
+
+def get_saved_recipes_by_user(db: Session, user_id: int):
+    """Kullanıcının kaydettiği tüm tarifleri ve planları getirir."""
+    return db.query(SavedRecipe).filter(SavedRecipe.user_id == user_id).all()
+
+
+def create_saved_recipe(db: Session, user_id: int, client_id: str, recipe_type: str, recipe_data: dict):
+    """Yeni bir tarifi/planı veritabanına kaydeder. Aynı client_id varsa üzerine yazar/günceller."""
+    db_item = db.query(SavedRecipe).filter(SavedRecipe.user_id == user_id, SavedRecipe.client_id == client_id).first()
+    if db_item:
+        db_item.recipe_data = recipe_data
+        db_item.recipe_type = recipe_type
+    else:
+        db_item = SavedRecipe(
+            user_id=user_id,
+            client_id=client_id,
+            recipe_type=recipe_type,
+            recipe_data=recipe_data
+        )
+        db.add(db_item)
+    db.commit()
+    db.refresh(db_item)
+    return db_item
+
+
+def delete_saved_recipe(db: Session, user_id: int, client_id: str):
+    """client_id'ye göre kaydedilmiş tarifi/planı siler."""
+    db_item = db.query(SavedRecipe).filter(SavedRecipe.user_id == user_id, SavedRecipe.client_id == client_id).first()
+    if db_item:
+        db.delete(db_item)
+        db.commit()
+        return True
+    return False
+

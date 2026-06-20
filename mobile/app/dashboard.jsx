@@ -229,33 +229,39 @@ export default function DashboardScreen() {
     if (!insight || !insight.daily_plans) return;
     
     try {
-      const storageModule = Platform.OS === 'web' ? window.localStorage : require('@react-native-async-storage/async-storage').default;
-      const data = Platform.OS === 'web' ? storageModule.getItem('bb_saved_recipes') : await storageModule.getItem('bb_saved_recipes');
-      let list = data ? JSON.parse(data) : [];
+      // 1. Backend'deki mevcut tarifleri çekerek mükerrer kayıtları önlüyoruz
+      const resp = await api.get('recipes/');
+      const existingRecipes = resp.data.filter(r => r.recipe_type === 'recipe');
       
       const testLabel = `Tahlil Sonucu: ${new Date().toLocaleDateString('tr-TR')}`;
       let addedCount = 0;
 
-      insight.daily_plans.forEach(day => {
-        day.meals.forEach(meal => {
-          if (!list.some(r => r.food_name === meal.food_name)) {
-            list.push({ ...meal, id: Date.now() + Math.random(), test_label: testLabel });
+      for (const day of insight.daily_plans) {
+        for (const meal of day.meals) {
+          const alreadySaved = existingRecipes.some(
+            r => r.recipe_data?.food_name === meal.food_name
+          );
+          if (!alreadySaved) {
+            const client_id = (Date.now() + Math.random()).toString();
+            const recipe_data = { ...meal, test_label: testLabel };
+            
+            await api.post('recipes/', {
+              client_id,
+              recipe_type: 'recipe',
+              recipe_data
+            });
             addedCount++;
           }
-        });
-      });
+        }
+      }
       
       if (addedCount > 0) {
-        if (Platform.OS === 'web') {
-          storageModule.setItem('bb_saved_recipes', JSON.stringify(list));
-        } else {
-          await storageModule.setItem('bb_saved_recipes', JSON.stringify(list));
-        }
         Alert.alert('Başarılı', `Tüm menüdeki ${addedCount} yeni tarif kaydedildi.`);
       } else {
         Alert.alert('Bilgi', 'Menüdeki tüm tarifler zaten kaydedilmiş.');
       }
     } catch (err) {
+      console.error(err);
       Alert.alert('Hata', 'Tarifler kaydedilemedi.');
     }
   };

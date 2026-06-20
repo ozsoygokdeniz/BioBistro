@@ -7,6 +7,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronLeft, Heart, Clock, Zap, Star, ChefHat } from 'lucide-react-native';
 import { theme } from '../src/theme';
 import { getMealImage } from '../src/imageMap';
+import api from '../src/api';
 
 const STATUS_BAR_HEIGHT = Platform.OS === 'android' ? StatusBar.currentHeight || 24 : 44;
 
@@ -22,6 +23,7 @@ export default function RecipeScreen() {
   const { meal: mealParam } = useLocalSearchParams();
 
   const [isSaved, setIsSaved] = React.useState(false);
+  const [savedClientId, setSavedClientId] = React.useState(null);
 
   let meal = null;
   try {
@@ -36,35 +38,46 @@ export default function RecipeScreen() {
 
   const checkIfSaved = async () => {
     try {
-      const storageModule = Platform.OS === 'web' ? window.localStorage : require('@react-native-async-storage/async-storage').default;
-      const data = Platform.OS === 'web' ? storageModule.getItem('bb_saved_recipes') : await storageModule.getItem('bb_saved_recipes');
-      if (data) {
-        const list = JSON.parse(data);
-        setIsSaved(list.some(r => r.food_name === meal.food_name));
+      const resp = await api.get('recipes/');
+      const matched = resp.data.find(
+        r => r.recipe_type === 'recipe' && r.recipe_data?.food_name === meal.food_name
+      );
+      if (matched) {
+        setIsSaved(true);
+        setSavedClientId(matched.client_id);
+      } else {
+        setIsSaved(false);
+        setSavedClientId(null);
       }
-    } catch (err) { }
+    } catch (err) {
+      console.warn('checkIfSaved error:', err);
+    }
   };
 
   const toggleSave = async () => {
     try {
-      const storageModule = Platform.OS === 'web' ? window.localStorage : require('@react-native-async-storage/async-storage').default;
-      const data = Platform.OS === 'web' ? storageModule.getItem('bb_saved_recipes') : await storageModule.getItem('bb_saved_recipes');
-      let list = data ? JSON.parse(data) : [];
-
       if (isSaved) {
-        list = list.filter(r => r.food_name !== meal.food_name);
+        if (savedClientId) {
+          await api.delete(`recipes/${savedClientId}`);
+          setIsSaved(false);
+          setSavedClientId(null);
+        }
       } else {
-        const newMeal = { ...meal, id: Date.now() };
-        list.push(newMeal);
-      }
+        const client_id = (Date.now() + Math.random()).toString();
+        const testLabel = meal.test_label || `Tahlil Sonucu: ${new Date().toLocaleDateString('tr-TR')}`;
+        const recipe_data = { ...meal, test_label: testLabel };
 
-      if (Platform.OS === 'web') {
-        storageModule.setItem('bb_saved_recipes', JSON.stringify(list));
-      } else {
-        await storageModule.setItem('bb_saved_recipes', JSON.stringify(list));
+        await api.post('recipes/', {
+          client_id,
+          recipe_type: 'recipe',
+          recipe_data
+        });
+        setIsSaved(true);
+        setSavedClientId(client_id);
       }
-      setIsSaved(!isSaved);
-    } catch (err) { }
+    } catch (err) {
+      console.warn('toggleSave error:', err);
+    }
   };
 
   if (!meal) {

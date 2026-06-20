@@ -140,3 +140,17 @@ class BloodTestHistoryItem(BaseModel):
     low_count: int
 
     model_config = ConfigDict(from_attributes=True)
+
+class SavedRecipeCreate(BaseModel):
+    client_id: str
+    recipe_type: str
+    recipe_data: dict
+
+class SavedRecipeResponse(BaseModel):
+    id: int
+    client_id: str
+    recipe_type: str
+    recipe_data: dict
+
+    model_config = ConfigDict(from_attributes=True)
+

@@ -39,8 +39,21 @@ export default function LoginScreen() {
       
       router.replace('/dashboard');
     } catch (err) {
-      setError('Geçersiz e-posta veya şifre.');
-      console.log('Login error:', err?.response?.data || err.message);
+      console.log('Login error details:', JSON.stringify({
+        message: err.message,
+        code: err.code,
+        status: err?.response?.status,
+        data: err?.response?.data,
+        url: err?.config?.baseURL + err?.config?.url,
+      }));
+      
+      if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+        setError('Sunucuya bağlanılamadı (zaman aşımı). Aynı WiFi ağında olduğunuzdan emin olun.');
+      } else if (err.code === 'ERR_NETWORK' || !err.response) {
+        setError('Sunucuya ulaşılamıyor. Backend çalıştığından ve aynı ağda olduğunuzdan emin olun.');
+      } else {
+        setError('Geçersiz e-posta veya şifre.');
+      }
     } finally {
       setLoading(false);
     }
