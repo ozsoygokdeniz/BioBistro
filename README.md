@@ -1,6 +1,7 @@
 # BioBistro
 
 BioBistro, e-Nabız üzerinden alınan PDF formatındaki kan tahlili sonuçlarını analiz eden ve yapay zeka destekli kişiselleştirilmiş beslenme programları sunan kapsamlı bir sağlık platformudur. Google Gemini AI ve PyMuPDF kullanarak karmaşık tıbbi verileri eyleme dönüştürülebilir, güvenli ve kişiye özel günlük yemek tariflerine çevirir.
+![BioBistro Uygulama Ekranı](https://github.com/ozsoygokdeniz/BioBistro/blob/main/mockup.png?raw=true)
 
 ## İçindekiler
 - [Özellikler](#özellikler)
