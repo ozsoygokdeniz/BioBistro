@@ -25,6 +25,7 @@ export default function Layout() {
       <Stack.Screen name="history" options={{ headerShown: false }} />
       <Stack.Screen name="saved" options={{ headerShown: false }} />
       <Stack.Screen name="recipe" options={{ headerShown: false }} />
+      <Stack.Screen name="saved_plan_detail" options={{ headerShown: false }} />
     </Stack>
   );
 }

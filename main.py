@@ -10,7 +10,7 @@ from services.ai_insight import generate_nutritional_insight
 from services.auth_deps import get_current_user
 from core.logging_middleware import LoggingMiddleware
 from schemas import BloodTestExtraction, NutritionalInsight
-from routers import auth, blood_tests, users
+from routers import auth, blood_tests, users, recipes
 
 app = FastAPI(
     title="BioBistro API",
@@ -18,21 +18,10 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS yapılandırması (Frontend erişimi için)
-origins = [
-    "http://localhost",
-    "http://localhost:3000",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173", # Vite Frontend (Alternative)
-    "http://localhost:5175", # New Vite Frontend Port
-    "http://127.0.0.1:5175",
-    "http://10.192.127.65:5173",  # Mobil erişim (LAN)
-    "http://192.168.56.1:5173",   # Mobil erişim (LAN alt)
-]
-
+# CORS yapılandırması — Geliştirme ortamı (tüm origin'lere izin ver)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -43,6 +32,7 @@ app.add_middleware(LoggingMiddleware)
 app.include_router(auth.router)
 app.include_router(blood_tests.router)
 app.include_router(users.router)
+app.include_router(recipes.router)
 
 # Mobil ve Web tarafında resimlerin yüklenebilmesi için static klasörünü sunuyoruz
 from fastapi.staticfiles import StaticFiles

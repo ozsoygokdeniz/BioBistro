@@ -12,8 +12,14 @@ env/
 env.bak/
 venv.bak/
 
-# SQLite
+# SQLite and other databases
 *.sqlite3
+*.db
+
+# Logs and outputs
+*.log
+*.txt
+*.pdf
 
 # Alembic
 # alembic.ini # alembic.ini'yi göndermek isteyebiliriz ama içindeki şifreyi .env'den okuttuğumuz için güvenli

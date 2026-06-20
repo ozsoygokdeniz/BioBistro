@@ -57,3 +57,15 @@ class BloodTestResult(Base):
     reference_range = Column(String, nullable=True) # örn. "10 - 120"
     
     blood_test = relationship('BloodTest', back_populates='results')
+
+class SavedRecipe(Base):
+    __tablename__ = 'saved_recipes'
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    client_id = Column(String, nullable=False, index=True)  # Client-side ID (e.g. timestamp or unique string)
+    recipe_type = Column(String, nullable=False)  # 'plan' (web 3-day plans) or 'recipe' (mobile individual meals)
+    recipe_data = Column(JSON, nullable=False)  # Raw recipe/plan JSON from frontend
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    user = relationship('User')
+

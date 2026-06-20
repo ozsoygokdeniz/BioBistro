@@ -122,29 +122,35 @@ const Dashboard = () => {
     }
   };
 
-  const handleSaveRecipe = () => {
+  const handleSaveRecipe = async () => {
     if (!insight) return;
     
-    const savedList = JSON.parse(localStorage.getItem('bb_saved_recipes') || '[]');
-    
-    const newRecipe = {
-      id: Date.now(),
-      pdfName: pdfName || results?.date_taken || 'Bilinmeyen PDF',
-      date: new Date().toLocaleDateString('tr-TR'),
-      insight: insight,
-    };
-    
-    savedList.push(newRecipe);
-    localStorage.setItem('bb_saved_recipes', JSON.stringify(savedList));
-    
-    // Reset dashboard
-    setResults(null);
-    setInsight(null);
-    setPdfName('');
-    
-    // Show toast instead of alert
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 3000);
+    try {
+      const client_id = Date.now().toString();
+      const recipe_data = {
+        pdfName: pdfName || results?.date_taken || 'Bilinmeyen PDF',
+        date: new Date().toLocaleDateString('tr-TR'),
+        insight: insight,
+      };
+
+      await api.post('recipes/', {
+        client_id,
+        recipe_type: 'plan',
+        recipe_data
+      });
+      
+      // Reset dashboard
+      setResults(null);
+      setInsight(null);
+      setPdfName('');
+      
+      // Show toast instead of alert
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    } catch (err) {
+      console.error(err);
+      alert('Tarif planı kaydedilirken bir hata oluştu.');
+    }
   };
 
   if (loading) return (

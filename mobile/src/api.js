@@ -5,15 +5,18 @@ import { Platform } from 'react-native';
 
 // Dynamically get the LAN IP address of the developer machine
 const debuggerHost = Constants.expoConfig?.hostUri || Constants.manifest?.debuggerHost;
-const ipAddress = debuggerHost ? debuggerHost.split(':')[0] : '10.52.160.221';
+const ipAddress = debuggerHost ? debuggerHost.split(':')[0] : '10.61.0.12';
 
 // Use localhost for web, LAN IP for physical device/emulator
 const API_URL = Platform.OS === 'web'
   ? 'http://localhost:8000/api/v1/'
   : `http://${ipAddress}:8000/api/v1/`;
 
+console.log('[BioBistro] API_URL:', API_URL, '| hostUri:', debuggerHost);
+
 const api = axios.create({
   baseURL: API_URL,
+  timeout: 90000,
 });
 
 api.interceptors.request.use(async (config) => {
