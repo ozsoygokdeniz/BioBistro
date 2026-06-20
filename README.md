@@ -1,57 +1,41 @@
 # BioBistro
 
-BioBistro, hastalarin kan tahlili (e-Nabiz PDF formatinda) sonuclarini analiz ederek, yapay zeka destekli kisisellestirilmis beslenme programlari ve yemek tarifleri sunan bir platformdur. Bu proje, kan degerlerindeki eksikliklere veya fazlaliklara yonelik ozel cozumler ureterek kullanicilarin saglikli beslenmesini hedeflemektedir.
+BioBistro, hastaların kan tahlillerini okuyup bu değerlere göre onlara özel yemek tarifleri çıkartan bir sağlık sistemi. Temel çıkış noktamız, e-Nabız üzerinden PDF formatında alınan kan tahlili sonuçlarını anlamlı beslenme diyetlerine dönüştürebilmek. 
 
-## Mimari ve Teknolojiler
+Uygulamanın arayüzü ve temel özellikleri şu şekilde işliyor:
 
-Proje uc ana bilesenden olusmaktadir:
-- **Backend:** FastAPI (Python), SQLAlchemy (ORM), Alembic (Migrasyonlar), Google Gemini AI API (Analiz), PyMuPDF (PDF ayiklama).
-- **Frontend:** React tabanli SPA (Single Page Application).
-- **Mobile:** React Native (Expo) tabanli capraz platform mobil uygulama.
+### 1. PDF İçerik Ayrıştırma ve Tahlil Yükleme
+![Tahlil Yükleme Ekranı](docs/upload-screen.png)
+*(Not: Uygulamanın tahlil yükleme ekranının bir görüntüsünü alıp proje dizininde oluşturacağınız `docs` klasörünün içine `upload-screen.png` adıyla koyarsanız burada doğrudan görünecektir.)*
 
-## Gerekli Kurulumlar
+Kullanıcı sisteme giriş yaptıktan sonra tahlil sonucunu PDF olarak yüklüyor. Arka planda PyMuPDF kütüphanesini kullanarak bu dosyayı okuyoruz. Burada sadece düz metin analizi yapmıyoruz; hastanın değerlerini referans aralıklarıyla karşılaştırıp nelerin eksik veya fazla olduğunu (demir eksikliği, kolesterol fazlalığı gibi) direkt kod tarafında tespit ediyoruz.
 
-Projeyi lokal ortamda calistirmak icin asagidaki adimlari takip edebilirsiniz. `.env` dosyasi guvenlik sebebiyle git uzerinde tutulmamaktadir, bu nedenle ornek formattan kendinize gore bir dosya olusturmaniz gerekmektedir.
+### 2. Yapay Zeka ile Kişiselleştirilmiş Diyet Reçetesi
+![Diyet ve Tarifler Ekranı](docs/recipes-screen.png)
+*(Not: Yapay zekanın çıkarttığı tariflerin yer aldığı ekran görüntüsünü `docs` klasörüne `recipes-screen.png` olarak ekleyebilirsiniz.)*
 
-### Gereksinimler
-- Python 3.10 veya ustu
-- Node.js 18 veya ustu
-- Gecerli bir Google Gemini API anahtari
+Çıkarttığımız bu temiz veri setini doğrudan Google Gemini API'sine gönderiyoruz. Gemini, hastanın mevcut değerlerini dengelemeye yönelik tamamen kişiselleştirilmiş bir beslenme planı ve yemek tarifleri oluşturuyor. Üstelik bu aşamada sistem, kullanıcının profilindeki yaş, kilo, boy ve özellikle alerji bilgilerini dikkate alarak tehlikeli olabilecek besinleri tariflerden otomatik olarak elliyor.
 
-### Backend Kurulumu
-1. Repoyu klonlayin ve proje dizinine gecin.
-2. Python sanal ortami (virtual environment) olusturun: `python -m venv venv`
-3. Sanal ortami aktif edin:
-   - Windows: `venv\Scripts\activate`
-   - Linux/Mac: `source venv/bin/activate`
-4. Bagimliliklari yukleyin: `pip install -r requirements.txt`
-5. `.env.example` dosyasinin adini `.env` olarak degistirin ve ilgili alanlari (ozellikle GEMINI_API_KEY degerini) doldurun.
-6. Veritabani tablolarini olusturmak icin migrasyonlari calistirin: `alembic upgrade head`
-7. Uygulamayi baslatin: `uvicorn main:app --reload` (Varsayilan olarak http://127.0.0.1:8000 adresinde calisacaktir).
+### 3. Profil ve Geçmiş Yönetimi
+![Profil ve Geçmiş Ekranı](docs/profile-screen.png)
+*(Not: Kullanıcının geçmiş tahlillerini ve kaydettiği favori tarifleri gördüğü ekranı `profile-screen.png` olarak ekleyebilirsiniz.)*
 
-### Frontend Web Kurulumu
-1. `frontend` dizinine gecin: `cd frontend`
-2. Node paketlerini yukleyin: `npm install`
-3. Gelistirme sunucusunu baslatin: `npm run dev`
+Sistemde JWT tabanlı standart ve güvenli bir üyelik yapısı mevcut. Kullanıcılar beğendikleri tarifleri kaydedebiliyor. Kendi profilleri üzerinden hem geçmiş tahlil analizlerine hem de bu analizlere göre önceden oluşturulmuş diyet programlarına istedikleri zaman ulaşabiliyorlar.
 
-### Mobil Uygulama Kurulumu
-1. `mobile` dizinine gecin: `cd mobile`
-2. Node paketlerini yukleyin: `npm install`
-3. Expo gelistirme sunucusunu baslatin: `npx expo start`
-4. Expo Go uygulamasi uzerinden cihaziniza kodu taratarak projeyi inceleyebilirsiniz.
+## Teknik Mimari
 
-## Dizin Yapisi
+Platformun altyapısını üç temel modüle ayırdık:
 
-- `core/`: Uygulama ici loglama, middleware gibi cekirdek yapilandirmalar.
-- `routers/`: Auth, kullanici yonetimi, kan tahlili yukleme ve tarif yonetimi API endpointleri.
-- `services/`: Is mantigi; PDF okuyuculari, Gemini AI prompt yonetimi ve auth islemleri.
-- `alembic/`: Veritabani sema degisikliklerinin takip edildigi migrasyon dosyalari.
-- `models.py` & `schemas.py`: SQLAlchemy tablolari ve veri dogrulama (Pydantic) semalari.
-- `frontend/`: Web projesi kaynak kodlari.
-- `mobile/`: Mobil uygulama kaynak kodlari.
+- Backend: API tarafında Python tabanlı FastAPI ve veritabanı işlemleri için SQLAlchemy kullanıyoruz. Geliştirme ortamında veritabanı olarak SQLite ayarlı ancak üretim ortamı için PostgreSQL gibi çözümlere rahatça geçilebilir. Veritabanı tarafındaki tablo versiyonlamalarını ve migrasyonları Alembic ile yönetiyoruz.
+- Frontend: Web tarafında standart React ve Vite altyapısı bulunuyor. Arayüz buradan hizmet veriyor.
+- Mobil: Kullanıcıların telefonlarından da erişebilmesi için Expo kullanılarak geliştirilmiş bir React Native uygulaması mevcut.
 
-## Veritabani Yonetimi
+## Geliştirme Ortamı Kurulumu
 
-Projede SQLite varsayilan veritabani olarak kullanilmistir. Modeller uzerinde bir degisiklik yapildiginda Alembic kullanilarak yeni bir revizyon olusturulmalidir:
-`alembic revision --autogenerate -m "degisiklik aciklamasi"`
-Ardindan `alembic upgrade head` komutuyla veritabanina uygulanabilir.
+Projeyi lokal bilgisayarınızda ayağa kaldırmak için şu adımları izleyebilirsiniz:
+
+Öncelikle backend için proje dizininde bir sanal ortam oluşturup `pip install -r requirements.txt` komutuyla paketleri kurun. Daha sonra kök dizindeki `.env.example` dosyasını kopyalayarak adını `.env` yapın ve içine kendi Google Gemini API anahtarınızı tanımlayın. Veritabanını hazırlamak için terminalden `alembic upgrade head` komutunu çalıştırın. Tüm bu hazırlıklar bittiğinde `uvicorn main:app --reload` komutuyla sunucuyu 8000 portunda başlatabilirsiniz.
+
+Kullanıcı arayüzleri için durum çok daha basit. Web arayüzü için `frontend` klasörüne, mobil arayüz için `mobile` klasörüne girerek `npm install` ile paketleri indirin. Web uygulamasını `npm run dev` ile, mobil uygulamayı ise `npx expo start` ile ayağa kaldırıp test etmeye başlayabilirsiniz.
+
+Kodlama standartları gereği backend tarafındaki veritabanı model güncellemelerinizden sonra mutlaka Alembic ile yeni revizyon dosyaları oluşturmayı unutmayın.
